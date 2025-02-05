@@ -39,10 +39,6 @@ extern crate memory_addr;
 
 mod platform;
 
-#[macro_use]
-pub mod trap;
-
-pub mod arch;
 pub mod cpu;
 pub mod mem;
 pub mod time;
@@ -72,7 +68,10 @@ pub mod mp {
     pub use super::platform::mp::*;
 }
 
+pub use axhal_cpu as arch;
+
 pub use self::platform::platform_init;
+pub use axhal_cpu::trap;
 
 #[cfg(feature = "smp")]
 pub use self::platform::platform_init_secondary;

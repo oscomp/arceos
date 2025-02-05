@@ -458,6 +458,7 @@ dependencies = [
  "arm_pl031",
  "axalloc",
  "axconfig",
+ "axhal_cpu",
  "axlog",
  "bitflags 2.8.0",
  "cfg-if",
@@ -485,6 +486,24 @@ dependencies = [
  "x86",
  "x86_64 0.15.2",
  "x86_rtc",
+]
+
+[[package]]
+name = "axhal_cpu"
+version = "0.1.0"
+source = "git+https://github.com/arceos-org/axhal_crates.git#5f3b3833972be92452a0ffc09042041c9f892bd4"
+dependencies = [
+ "aarch64-cpu 10.0.0",
+ "cfg-if",
+ "linkme",
+ "log",
+ "memory_addr",
+ "page_table_entry",
+ "riscv",
+ "static_assertions",
+ "tock-registers 0.9.0",
+ "x86",
+ "x86_64 0.15.2",
 ]
 
 [[package]]
