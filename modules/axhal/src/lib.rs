@@ -25,9 +25,7 @@
 //! [cargo test]: https://doc.rust-lang.org/cargo/guide/tests.html
 
 #![no_std]
-#![feature(naked_functions)]
 #![feature(doc_auto_cfg)]
-#![feature(sync_unsafe_cell)]
 
 #[allow(unused_imports)]
 #[macro_use]
@@ -36,8 +34,6 @@ extern crate log;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate memory_addr;
-
-mod platform;
 
 pub mod cpu;
 pub mod mem;
@@ -54,24 +50,33 @@ pub mod paging;
 
 /// Console input and output.
 pub mod console {
-    pub use super::platform::console::*;
+    pub use axhal_plat::console::{read_bytes, write_bytes};
 }
 
-/// Miscellaneous operation, e.g. terminate the system.
-pub mod misc {
-    pub use super::platform::misc::*;
+/// CPU power management.
+pub mod power {
+    #[cfg(feature = "smp")]
+    pub use axhal_plat::power::cpu_boot;
+    pub use axhal_plat::power::system_off;
 }
 
-/// Multi-core operations.
-#[cfg(feature = "smp")]
-pub mod mp {
-    pub use super::platform::mp::*;
+/// Trap handling.
+pub mod trap {
+    pub use axhal_cpu::trap::{IRQ, PAGE_FAULT};
+    pub use axhal_cpu::trap::{PageFaultFlags, register_trap_handler};
 }
 
 pub use axhal_cpu as arch;
 
-pub use self::platform::platform_init;
-pub use axhal_cpu::trap;
+pub use axhal_plat::init::{platform_init, platform_init_secondary};
 
-#[cfg(feature = "smp")]
-pub use self::platform::platform_init_secondary;
+/// Initializes HAL data structures for the primary core.
+pub fn init(cpu_id: usize, _dtb: usize) {
+    self::cpu::init_primary(cpu_id);
+    self::mem::init();
+}
+
+/// Initializes HAL data structures for secondary cores.
+pub fn init_secondary(cpu_id: usize) {
+    self::cpu::init_secondary(cpu_id);
+}

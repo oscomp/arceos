@@ -93,15 +93,15 @@ fn is_init_ok() -> bool {
 
 /// The main entry point of the ArceOS runtime.
 ///
-/// It is called from the bootstrapping code in [axhal]. `cpu_id` is the ID of
-/// the current CPU, and `dtb` is the address of the device tree blob. It
-/// finally calls the application's `main` function after all initialization
-/// work is done.
+/// It is called from the bootstrapping code in the specific platform crate (see
+/// [`axhal_cpu::call_main`]). `cpu_id` is the logic ID of the current CPU, and
+/// `dtb` is the address of the device tree blob. It finally calls the
+/// application's `main` function after all initialization work is done.
 ///
-/// In multi-core environment, this function is called on the primary CPU,
-/// and the secondary CPUs call [`rust_main_secondary`].
-#[cfg_attr(not(test), unsafe(no_mangle))]
-pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
+/// In multi-core environment, this function is called on the primary core, and
+/// secondary cores call [`rust_main_secondary`].
+#[axhal_plat::main]
+pub fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     ax_println!("{}", LOGO);
     ax_println!(
         "\
@@ -129,6 +129,8 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     axlog::set_max_level(option_env!("AX_LOG").unwrap_or("")); // no effect if set `log-level-*` features
     info!("Logging is enabled.");
     info!("Primary CPU {} started, dtb = {:#x}.", cpu_id, dtb);
+
+    axhal::init(cpu_id, dtb);
 
     info!("Found physcial memory regions:");
     for r in axhal::mem::memory_regions() {
@@ -199,7 +201,7 @@ pub extern "C" fn rust_main(cpu_id: usize, dtb: usize) -> ! {
     #[cfg(not(feature = "multitask"))]
     {
         debug!("main task exited: exit_code={}", 0);
-        axhal::misc::terminate();
+        axhal::power::system_off();
     }
 }
 
@@ -234,8 +236,6 @@ fn init_allocator() {
 
 #[cfg(feature = "irq")]
 fn init_interrupt() {
-    use axhal::time::TIMER_IRQ_NUM;
-
     // Setup timer interrupt handler
     const PERIODIC_INTERVAL_NANOS: u64 =
         axhal::time::NANOS_PER_SEC / axconfig::TICKS_PER_SEC as u64;
@@ -254,7 +254,7 @@ fn init_interrupt() {
         axhal::time::set_oneshot_timer(deadline);
     }
 
-    axhal::irq::register_handler(TIMER_IRQ_NUM, || {
+    axhal::irq::register(axconfig::devices::TIMER_IRQ, || {
         update_timer();
         #[cfg(feature = "multitask")]
         axtask::on_timer_tick();
