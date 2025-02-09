@@ -21,9 +21,14 @@ SECTIONS
         *(.rodata .rodata.*)
         *(.srodata .srodata.*)
         *(.sdata2 .sdata2.*)
-        . = ALIGN(4K);
-        _erodata = .;
     }
+    .init_array : ALIGN(0x10) {
+        __init_array_start = .;
+        *(.init_array .init_array.*)
+        __init_array_end = .;
+    }
+    . = ALIGN(4K);
+    _erodata = .;
 
     .data : ALIGN(4K) {
         _sdata = .;
@@ -38,13 +43,6 @@ SECTIONS
         _stdata = .;
         *(.tdata .tdata.*)
         _etdata = .;
-    }
-
-    .init_array : ALIGN(4K) {
-        __init_array_start = .;
-        *(.init_array .init_array.*)
-        __init_array_end = .;
-        . = ALIGN(4K);
     }
 
     .tbss : ALIGN(0x10) {
@@ -68,7 +66,7 @@ SECTIONS
     . = ALIGN(4K);
     _edata = .;
 
-    .bss : ALIGN(4K) {
+    .bss : AT(.) ALIGN(4K) {
         boot_stack = .;
         *(.bss.stack)
         . = ALIGN(4K);

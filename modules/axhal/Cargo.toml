@@ -59,5 +59,8 @@ arm_pl011 = "0.1"
 arm_pl031 = { version = "0.2", optional = true }
 dw_apb_uart = "0.1"
 
+[target.'cfg(target_arch = "loongarch64")'.dependencies]
+loongArch64 = "0.2.4"
+
 [build-dependencies]
 axconfig = { workspace = true }

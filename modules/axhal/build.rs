@@ -8,6 +8,7 @@ const BUILTIN_PLATFORMS: &[&str] = &[
     "riscv64-qemu-virt",
     "x86_64-pc-oslab",
     "x86_64-qemu-q35",
+    "loongarch64-qemu-virt",
 ];
 
 const BUILTIN_PLATFORM_FAMILIES: &[&str] = &[
@@ -17,6 +18,7 @@ const BUILTIN_PLATFORM_FAMILIES: &[&str] = &[
     "aarch64-raspi",
     "riscv64-qemu-virt",
     "x86-pc",
+    "loongarch64-qemu-virt",
 ];
 
 fn make_cfg_values(str_list: &[&str]) -> String {

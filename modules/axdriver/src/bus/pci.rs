@@ -35,7 +35,6 @@ fn config_pci_device(
                 }
             }
         }
-
         // read the BAR info again after assignment.
         let info = root.bar_info(bdf, bar).unwrap();
         match info {
@@ -72,7 +71,6 @@ fn config_pci_device(
             bar += 1;
         }
     }
-
     // Enable the device.
     let (_status, cmd) = root.get_status_command(bdf);
     root.set_command(
@@ -91,7 +89,6 @@ impl AllDevices {
         let mut allocator = axconfig::devices::PCI_RANGES
             .get(1)
             .map(|range| PciRangeAllocator::new(range.0 as u64, range.1 as u64));
-
         for bus in 0..=axconfig::devices::PCI_BUS_END as u8 {
             for (bdf, dev_info) in root.enumerate_bus(bus) {
                 debug!("PCI {}: {}", bdf, dev_info);
