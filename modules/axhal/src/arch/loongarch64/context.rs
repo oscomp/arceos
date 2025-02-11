@@ -249,6 +249,12 @@ impl TaskContext {
             self.tp = super::read_thread_pointer();
             unsafe { super::write_thread_pointer(next_ctx.tp) };
         }
+        #[cfg(feature = "uspace")]
+        {
+            if self.pgdl != next_ctx.pgdl {
+                unsafe { super::write_page_table_root0(pa!(next_ctx.pgdl)) };
+            }
+        }
         unsafe { context_switch(self, next_ctx) }
     }
 }

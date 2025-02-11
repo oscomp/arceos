@@ -54,6 +54,16 @@ pub fn read_page_table_root() -> PhysAddr {
     PhysAddr::from(pgd::read().base())
 }
 
+/// Writes the `TTBR0_EL1` register.
+///
+/// # Safety
+///
+/// This function is unsafe as it changes the virtual memory address space.
+pub unsafe fn write_page_table_root0(root_paddr: PhysAddr) {
+    pgdl::set_base(root_paddr.as_usize() as _);
+    flush_tlb(None);
+}
+
 /// Writes the register to update the current page table root.
 ///
 /// # Safety
@@ -63,31 +73,9 @@ pub fn read_page_table_root() -> PhysAddr {
 /// page table. So we prohibit inline operation.
 #[inline(never)]
 pub fn write_page_table_root(root_paddr: PhysAddr) {
-    unsafe extern "C" {
-        fn trap_vector_base();
-        fn handle_tlb_refill();
-    }
-    set_trap_vector_base(trap_vector_base as usize);
-
-    let old_root = read_page_table_root();
-    trace!("set page table root: {:#x} => {:#x}", old_root, root_paddr);
-    trace!("ROOT_ADDR: 0x{:x}", root_paddr.as_usize());
-
-    // error:
     pgdh::set_base(root_paddr.as_usize());
-    pgdl::set_base(root_paddr.as_usize());
     flush_tlb(None);
-    // can work:
-    // unsafe {
-    //     asm!(
-    //         "dbar  0       ",           // sync
-    //         "csrwr {root_paddr}, 0x19", // PGDL
-    //         "csrwr {root_paddr}, 0x1a", // PGDH
-    //         // when set pgd, MUST flush tlb. becase of old PTE in tlb.
-    //         "invtlb 0x00, $r0, $r0   ", // flush tlb
-    //         root_paddr = in(reg) root_paddr.as_usize(),
-    //     )
-    // }
+
     trace!("PGD_CTX  : 0x{:x}", pgd::read().base());
 }
 
@@ -122,17 +110,7 @@ pub const PS_1G: usize = 0x1e;
 pub const PAGE_SIZE_SHIFT: usize = 12;
 
 pub fn tlb_init(kernel_pgd_base: usize, _tlbrentry: usize) {
-    // // setup PWCTL
-    // unsafe {
-    // asm!(
-    //     "li.d     $r21,  0x4d52c",     // (9 << 15) | (21 << 10) | (9 << 5) | 12
-    //     "csrwr    $r21,  0x1c",        // LOONGARCH_CSR_PWCTL0
-    //     "li.d     $r21,  0x25e",       // (9 << 6)  | 30
-    //     "csrwr    $r21,  0x1d",        //LOONGARCH_CSR_PWCTL1
-    //     )
-    // }
-
-    pgdl::set_base(kernel_pgd_base);
+    pgdl::set_base(0);
     pgdh::set_base(kernel_pgd_base);
 }
 
@@ -141,22 +119,6 @@ pub fn init_tlb() {
     tlbidx::set_ps(PS_4K);
     stlbps::set_ps(PS_4K);
     tlbrehi::set_ps(PS_4K);
-
-    // // set hardware
-    // pwcl::set_pte_width(8);               // 64-bits
-    // pwcl::set_ptbase(12);
-    // pwcl::set_ptwidth(9);
-    // pwcl::set_dir1_base(21);
-    // pwcl::set_dir1_width(9);
-    // pwcl::set_dir2_base(30);
-    // pwcl::set_dir2_width(9);
-
-    // unsafe extern "C" {
-    //     fn handle_tlb_refill();
-    // }
-    // let vaddr = VirtAddr::from_usize(handle_tlb_refill as usize);
-    // let paddr = crate::mem::virt_to_phys(vaddr);
-    // set_tlb_refill(paddr.as_usize());
 }
 
 /// Reads the thread pointer of the current CPU.

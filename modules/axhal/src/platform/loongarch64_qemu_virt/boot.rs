@@ -43,7 +43,7 @@ unsafe fn init_mmu() {
 
     let paddr = crate::mem::virt_to_phys(va!(&raw const BOOT_PT_L0 as usize));
     pgdh::set_base(paddr.as_usize());
-    pgdl::set_base(paddr.as_usize());
+    pgdl::set_base(0);
 }
 
 /// The earliest entry point for the primary CPU.
