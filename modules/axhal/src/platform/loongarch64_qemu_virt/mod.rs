@@ -84,7 +84,9 @@ pub mod misc {
         info!("Shutting down...");
         const HALT_ADDR: *mut u8 = phys_to_virt(pa!(axconfig::devices::GED_PADDR)).as_mut_ptr();
         unsafe { HALT_ADDR.write_volatile(0x34) };
-        loop { crate::arch::halt() };
+        loop {
+            crate::arch::halt();
+        }
     }
 }
 

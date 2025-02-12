@@ -46,8 +46,8 @@ pub fn new_kernel_aspace() -> AxResult<AddrSpace> {
 pub fn new_user_aspace(base: VirtAddr, size: usize) -> AxResult<AddrSpace> {
     let mut aspace = AddrSpace::new_empty(base, size)?;
     if !cfg!(target_arch = "aarch64") && !cfg!(target_arch = "loongarch64") {
-        // ARMv8 and loongarch64 use a separate page table (aarch64: TTBR0_EL1, 
-        // loongarch64: pgdl) for user space, it doesn't need to copy the kernel 
+        // ARMv8 and loongarch64 use a separate page table (aarch64: TTBR0_EL1,
+        // loongarch64: pgdl) for user space, it doesn't need to copy the kernel
         // portion to the user page table.
         aspace.copy_mappings_from(&kernel_aspace().lock())?;
     }
