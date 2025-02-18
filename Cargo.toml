@@ -65,5 +65,9 @@ axsync = { path = "modules/axsync" }
 axtask = { path = "modules/axtask" }
 axdma = { path = "modules/axdma" }
 
+[patch.crates-io]
+page_table_multiarch = { git = "https://github.com/yfblock/page_table_multiarch.git", rev = "c8a13b0"}
+page_table_entry = { git = "https://github.com/yfblock/page_table_multiarch.git", rev = "c8a13b0" }
+
 [profile.release]
 lto = true
