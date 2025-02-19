@@ -5,7 +5,7 @@ on: [push, pull_request]
 env:
   qemu-version: 9.2.1
   rust-toolchain: nightly-2024-12-25
-  arceos-apps: '855106c'
+  arceos-apps: 'f65c58f'
 
 jobs:
   unit-test:
@@ -44,7 +44,7 @@ jobs:
     - name: Run app tests
       run: |
         make disk_img
-        git clone https://github.com/arceos-org/arceos-apps.git
+        git clone https://github.com/oscomp/arceos-apps.git
         cd arceos-apps && git reset --hard ${{ env.arceos-apps }} && cd ..
         make -C arceos-apps chaxroot AX_ROOT=$(pwd)
         make -C arceos-apps test ARCH=${{ matrix.arch }}
