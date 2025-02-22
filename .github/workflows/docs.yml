@@ -25,6 +25,9 @@ jobs:
       with:
         shared-key: cargo-bin-cache
         cache-targets: false
+    - uses: arceos-org/setup-musl@v1
+      with:
+        arch: x86_64
     - name: Build docs
       run: make doc_check_missing ARCH=${{ matrix.os == 'macos-latest' && 'aarch64' || 'x86_64' }}
     - name: Deploy to Github Pages

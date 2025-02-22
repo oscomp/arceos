@@ -25,6 +25,9 @@ jobs:
         cache-targets: false
     - name: Check rust version
       run: rustc --version --verbose
+    - uses: arceos-org/setup-musl@v1
+      with:
+        arch: ${{ matrix.arch }}
     - name: Check code format
       if: ${{ matrix.arch == 'x86_64' }}
       continue-on-error: ${{ matrix.rust-toolchain == 'nightly' }}
