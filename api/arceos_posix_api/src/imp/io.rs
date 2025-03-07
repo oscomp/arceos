@@ -66,7 +66,12 @@ pub unsafe fn sys_writev(fd: c_int, iov: *const ctypes::iovec, iocnt: c_int) -> 
         let iovs = unsafe { core::slice::from_raw_parts(iov, iocnt as usize) };
         let mut ret = 0;
         for iov in iovs.iter() {
-            ret += write_impl(fd, iov.iov_base, iov.iov_len)?;
+            let result = write_impl(fd, iov.iov_base, iov.iov_len)?;
+            ret += result;
+
+            if result < iov.iov_len as isize {
+                break;
+            }
         }
 
         Ok(ret)
