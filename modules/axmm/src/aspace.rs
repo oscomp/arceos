@@ -359,25 +359,33 @@ impl AddrSpace {
             for vaddr in
                 PageIter4K::new(area.start(), area.end()).expect("Failed to create page iterator")
             {
-                let addr = match self.pt.query(vaddr) {
-                    Ok((paddr, _, _)) => paddr,
+                fn checked_query(pt: &PageTable, vaddr: VirtAddr) -> AxResult<Option<PhysAddr>> {
+                    match pt.query(vaddr) {
+                        Ok((paddr, _, _)) => {
+                            if paddr.as_usize() != 0 {
+                                Ok(Some(paddr))
+                            } else {
+                                Ok(None)
+                            }
+                        }
+                        Err(PagingError::NotMapped) => Ok(None),
+                        Err(_) => Err(AxError::BadAddress),
+                    }
+                }
+
+                let Some(addr) = checked_query(&self.pt, vaddr)? else {
                     // If the page is not mapped, skip it.
-                    Err(PagingError::NotMapped) => continue,
-                    Err(_) => return Err(AxError::BadAddress),
+                    continue;
                 };
-                let new_addr = match new_aspace.pt.query(vaddr) {
-                    Ok((paddr, _, _)) => paddr,
-                    // If the page is not mapped, try map it.
-                    Err(PagingError::NotMapped) => {
+                let new_addr = match checked_query(&new_aspace.pt, vaddr)? {
+                    Some(addr) => addr,
+                    None => {
+                        // If the page is not mapped, try map it.
                         if !backend.handle_page_fault(vaddr, area.flags(), &mut new_aspace.pt) {
                             return Err(AxError::NoMemory);
                         }
-                        match new_aspace.pt.query(vaddr) {
-                            Ok((paddr, _, _)) => paddr,
-                            Err(_) => return Err(AxError::BadAddress),
-                        }
+                        checked_query(&new_aspace.pt, vaddr)?.ok_or(AxError::BadAddress)?
                     }
-                    Err(_) => return Err(AxError::BadAddress),
                 };
                 unsafe {
                     core::ptr::copy_nonoverlapping(
