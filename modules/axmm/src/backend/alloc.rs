@@ -50,6 +50,8 @@ impl Backend {
                     }
                 }
             }
+        } else {
+            // create mapping entries on demand later in `handle_page_fault_alloc`.
         }
         true
     }
