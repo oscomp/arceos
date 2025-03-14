@@ -152,7 +152,7 @@ impl AddrSpace {
 
     /// Populates the area with physical frames, returning false if the area
     /// contains unmapped area.
-    pub fn populate_area(&mut self, mut start: VirtAddr, size: usize) -> AxResult<bool> {
+    pub fn populate_area(&mut self, mut start: VirtAddr, size: usize) -> AxResult {
         self.validate_region(start, size)?;
         let end = start + size;
 
@@ -183,7 +183,12 @@ impl AddrSpace {
             }
         }
 
-        Ok(start >= end)
+        if start < end {
+            // If the area is not fully mapped, we return ENOMEM.
+            return ax_err!(NoMemory);
+        }
+
+        Ok(())
     }
 
     /// Removes mappings within the specified virtual address range.
@@ -306,10 +311,7 @@ impl AddrSpace {
     /// aligned.
     pub fn protect(&mut self, start: VirtAddr, size: usize, flags: MappingFlags) -> AxResult {
         // Populate the area first, which also checks the address range for us.
-        if !self.populate_area(start, size)? {
-            // If the area is not fully mapped, we return ENOMEM.
-            return ax_err!(NoMemory);
-        }
+        self.populate_area(start, size)?;
 
         self.areas
             .protect(start, size, |_| Some(flags), &mut self.pt)
