@@ -1,10 +1,10 @@
 use core::fmt;
 
-use axerrno::{AxError, AxResult, ax_err};
+use axerrno::{ax_err, AxError, AxResult};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError};
 use memory_addr::{
-    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
+    is_aligned_4k, MemoryAddr, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, PAGE_SIZE_4K,
 };
 use memory_set::{MemoryArea, MemorySet};
 
@@ -159,21 +159,19 @@ impl AddrSpace {
         while let Some(area) = self.areas.find(start) {
             let backend = area.backend();
             if let Backend::Alloc { populate } = backend {
-                // Area is already populated.
-                if *populate {
-                    continue;
-                }
-                for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
-                    match self.pt.query(addr) {
-                        Ok(_) => {}
-                        // If the page is not mapped, try map it.
-                        Err(PagingError::NotMapped) => {
-                            if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
-                                return Err(AxError::NoMemory);
+                if !*populate {
+                    for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
+                        match self.pt.query(addr) {
+                            Ok(_) => {}
+                            // If the page is not mapped, try map it.
+                            Err(PagingError::NotMapped) => {
+                                if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
+                                    return Err(AxError::NoMemory);
+                                }
                             }
-                        }
-                        Err(_) => return Err(AxError::BadAddress),
-                    };
+                            Err(_) => return Err(AxError::BadAddress),
+                        };
+                    }
                 }
             }
             start = area.end();
