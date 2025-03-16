@@ -17,7 +17,7 @@ pub struct File {
 }
 
 /// Metadata information about a file.
-pub struct Metadata(fops::FileAttr);
+pub struct Metadata(pub(super) fops::FileAttr);
 
 /// Options and flags which can be used to configure how a file is opened.
 #[derive(Default, Clone, Debug)]
