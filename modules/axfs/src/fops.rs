@@ -308,6 +308,9 @@ impl Directory {
 
         node.open()?;
         Ok(Self {
+            // Here we use `cap` as capability instead of `access_cap` to allow the user to manipulate the directory
+            // without explicitly setting [`OpenOptions::execute`], but without requiring execute access even for
+            // directories that don't have this permission.
             node: WithCap::new(node, cap),
             entry_idx: 0,
         })
