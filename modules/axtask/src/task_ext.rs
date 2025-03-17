@@ -11,6 +11,10 @@ static __AX_TASK_EXT_SIZE: usize = 0;
 #[linkage = "weak"]
 static __AX_TASK_EXT_ALIGN: usize = 0;
 
+#[unsafe(no_mangle)]
+#[linkage = "weak"]
+fn __ax_task_ext_drop(_data: *mut u8) {}
+
 /// A wrapper of pointer to the task extended data.
 pub(crate) struct AxTaskExt {
     ptr: *mut u8,
