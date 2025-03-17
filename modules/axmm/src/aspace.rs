@@ -1,12 +1,14 @@
 use core::fmt;
+use core::mem::ManuallyDrop;
 
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
-use axhal::paging::{MappingFlags, PageTable, PagingError};
+use axhal::paging::{MappingFlags, PageTable, PagingError, PagingHandlerImpl};
 use memory_addr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
+use page_table_multiarch::PagingHandler;
 
 use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
@@ -15,7 +17,10 @@ use crate::mapping_err_to_ax_err;
 pub struct AddrSpace {
     va_range: VirtAddrRange,
     areas: MemorySet<Backend>,
-    pt: PageTable,
+    /// [`PageTable`] unmaps all page entries on drop, however some of them
+    /// might be copied from other address spaces (e.g. kernel space), so we
+    /// need to handle the drop manually.
+    pt: ManuallyDrop<PageTable>,
 }
 
 impl AddrSpace {
@@ -35,12 +40,12 @@ impl AddrSpace {
     }
 
     /// Returns the reference to the inner page table.
-    pub const fn page_table(&self) -> &PageTable {
+    pub fn page_table(&self) -> &PageTable {
         &self.pt
     }
 
     /// Returns the root physical address of the inner page table.
-    pub const fn page_table_root(&self) -> PhysAddr {
+    pub fn page_table_root(&self) -> PhysAddr {
         self.pt.root_paddr()
     }
 
@@ -55,7 +60,7 @@ impl AddrSpace {
         Ok(Self {
             va_range: VirtAddrRange::from_start_size(base, size),
             areas: MemorySet::new(),
-            pt: PageTable::try_new().map_err(|_| AxError::NoMemory)?,
+            pt: ManuallyDrop::new(PageTable::try_new().map_err(|_| AxError::NoMemory)?),
         })
     }
 
@@ -433,5 +438,9 @@ impl fmt::Debug for AddrSpace {
 impl Drop for AddrSpace {
     fn drop(&mut self) {
         self.clear();
+        // Now that user mappings are cleared, we can and only can dealloc the
+        // page table root, since [`PageTable::copy_from`] copied first layer
+        // page table entries only.
+        PagingHandlerImpl::dealloc_frame(self.pt.root_paddr());
     }
 }
