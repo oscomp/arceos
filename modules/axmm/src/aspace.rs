@@ -1,14 +1,12 @@
 use core::fmt;
-use core::mem::ManuallyDrop;
 
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
-use axhal::paging::{MappingFlags, PageTable, PagingError, PagingHandlerImpl};
+use axhal::paging::{MappingFlags, PageTable, PagingError};
 use memory_addr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
-use page_table_multiarch::PagingHandler;
 
 use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
@@ -17,10 +15,13 @@ use crate::mapping_err_to_ax_err;
 pub struct AddrSpace {
     va_range: VirtAddrRange,
     areas: MemorySet<Backend>,
-    /// [`PageTable`] unmaps all page entries on drop, however some of them
-    /// might be copied from other address spaces (e.g. kernel space), so we
-    /// need to handle the drop manually.
-    pt: ManuallyDrop<PageTable>,
+    pt: PageTable,
+
+    /// The range of virtual addresses that have been copied from another
+    /// address space.
+    ///
+    /// This is used to handle the page table recycling properly.
+    copy_from_range: Option<VirtAddrRange>,
 }
 
 impl AddrSpace {
@@ -60,7 +61,8 @@ impl AddrSpace {
         Ok(Self {
             va_range: VirtAddrRange::from_start_size(base, size),
             areas: MemorySet::new(),
-            pt: ManuallyDrop::new(PageTable::try_new().map_err(|_| AxError::NoMemory)?),
+            pt: PageTable::try_new().map_err(|_| AxError::NoMemory)?,
+            copy_from_range: None,
         })
     }
 
@@ -70,12 +72,18 @@ impl AddrSpace {
     /// usually used to copy a portion of the kernel space mapping to the
     /// user space.
     ///
+    /// Note that this can only be called at most once.
+    ///
     /// Returns an error if the two address spaces overlap.
     pub fn copy_mappings_from(&mut self, other: &AddrSpace) -> AxResult {
+        if self.copy_from_range.is_some() {
+            return ax_err!(InvalidInput, "address space can only be copied to once");
+        }
         if self.va_range.overlaps(other.va_range) {
             return ax_err!(InvalidInput, "address space overlap");
         }
         self.pt.copy_from(&other.pt, other.base(), other.size());
+        self.copy_from_range = Some(other.va_range);
         Ok(())
     }
 
@@ -438,9 +446,9 @@ impl fmt::Debug for AddrSpace {
 impl Drop for AddrSpace {
     fn drop(&mut self) {
         self.clear();
-        // Now that user mappings are cleared, we can and only can dealloc the
-        // page table root, since [`PageTable::copy_from`] copied first layer
-        // page table entries only.
-        PagingHandlerImpl::dealloc_frame(self.pt.root_paddr());
+        if let Some(copy_from_range) = self.copy_from_range {
+            self.pt
+                .clear_copy_range(copy_from_range.start, copy_from_range.size());
+        }
     }
 }
