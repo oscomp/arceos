@@ -21,6 +21,3 @@ memory_addr = "0.3"
 kspin = "0.1"
 memory_set = "0.3"
 page_table_multiarch = "0.5.3"
-
-[patch.crates-io]
-page_table_multiarch = { git = "https://github.com/Mivik/page-table-multiarch.git", rev = "19ededd" }
