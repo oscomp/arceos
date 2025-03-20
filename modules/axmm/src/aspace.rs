@@ -35,12 +35,12 @@ impl AddrSpace {
     }
 
     /// Returns the reference to the inner page table.
-    pub fn page_table(&self) -> &PageTable {
+    pub const fn page_table(&self) -> &PageTable {
         &self.pt
     }
 
     /// Returns the root physical address of the inner page table.
-    pub fn page_table_root(&self) -> PhysAddr {
+    pub const fn page_table_root(&self) -> PhysAddr {
         self.pt.root_paddr()
     }
 
