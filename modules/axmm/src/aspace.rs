@@ -67,7 +67,7 @@ impl AddrSpace {
     ///
     /// Note that on dropping, the copied PTEs will also be cleared, which could
     /// taint the original page table. For workaround, you can use
-    /// [`clear_mappings`].
+    /// [`AddrSpace::clear_mappings`].
     ///
     /// Returns an error if the two address spaces overlap.
     pub fn copy_mappings_from(&mut self, other: &AddrSpace) -> AxResult {
@@ -80,7 +80,7 @@ impl AddrSpace {
 
     /// Clears the page table mappings in the given address range.
     ///
-    /// This should be used in pair with [`copy_mappings_from`].
+    /// This should be used in pair with [`AddrSpace::copy_mappings_from`].
     pub fn clear_mappings(&mut self, range: VirtAddrRange) {
         self.pt.clear_copy_range(range.start, range.size());
     }
