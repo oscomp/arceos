@@ -279,6 +279,14 @@ impl File {
     pub fn get_attr(&self) -> AxResult<FileAttr> {
         self.access_node(Cap::empty())?.get_attr()
     }
+
+    pub fn set_atime(&self, atime: usize) -> AxResult{
+        self.access_node(Cap::empty())?.set_atime(atime)
+    }
+    pub fn set_mtime(&self, mtime: usize) -> AxResult{
+        self.access_node(Cap::empty())?.set_mtime(mtime)
+    }
+
 }
 
 impl Directory {

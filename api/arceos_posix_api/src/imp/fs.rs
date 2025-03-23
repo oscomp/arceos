@@ -8,6 +8,7 @@ use axio::{PollState, SeekFrom};
 use axsync::Mutex;
 
 use super::fd_ops::{FileLike, get_file_like};
+use crate::ctypes::timespec;
 use crate::AT_FDCWD;
 use crate::{ctypes, utils::char_ptr_to_str};
 
@@ -61,6 +62,7 @@ impl FileLike for File {
         let ty = metadata.file_type() as u8;
         let perm = metadata.perm().bits() as u32;
         let st_mode = ((ty as u32) << 12) | perm;
+        info!("stat: a_time: {}, m_time: {}", metadata.atime(), metadata.mtime());
         Ok(ctypes::stat {
             st_ino: 1,
             st_nlink: 1,
@@ -70,6 +72,8 @@ impl FileLike for File {
             st_size: metadata.size() as _,
             st_blocks: metadata.blocks() as _,
             st_blksize: 512,
+            st_atime: timespec{tv_sec: metadata.atime() as _, tv_nsec: 0},
+            st_mtime: timespec{tv_sec: metadata.mtime() as _, tv_nsec: 0},
             ..Default::default()
         })
     }
@@ -87,6 +91,14 @@ impl FileLike for File {
 
     fn set_nonblocking(&self, _nonblocking: bool) -> LinuxResult {
         Ok(())
+    }
+
+    fn set_atime(&self, atime: usize) -> LinuxResult {
+        Ok(self.inner.lock().set_atime(atime)?)
+    }
+
+    fn set_mtime(&self, mtime: usize) -> LinuxResult {
+        Ok(self.inner.lock().set_mtime(mtime)?)
     }
 }
 

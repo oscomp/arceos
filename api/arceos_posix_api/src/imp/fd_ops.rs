@@ -20,6 +20,12 @@ pub trait FileLike: Send + Sync {
     fn into_any(self: Arc<Self>) -> Arc<dyn core::any::Any + Send + Sync>;
     fn poll(&self) -> LinuxResult<PollState>;
     fn set_nonblocking(&self, nonblocking: bool) -> LinuxResult;
+    fn set_atime(&self, _atime: usize) -> LinuxResult {
+        unimplemented!("set_atime of FileLike")
+    }
+    fn set_mtime(&self, _mtime: usize) -> LinuxResult {
+        unimplemented!("set_mtime of FileLike")
+    }
 }
 
 def_resource! {
