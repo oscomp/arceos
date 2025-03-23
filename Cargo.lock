@@ -420,7 +420,7 @@ dependencies = [
 [[package]]
 name = "axfs_devfs"
 version = "0.1.1"
-source = "git+https://github.com/Ressed/axfs_crates.git#b0b52712b9395458b9590b055f3410ae2d8ff75b"
+source = "git+https://github.com/Ressed/axfs_crates.git#0f38e66eaaf3de99a745270189955b5c13bf4ce0"
 dependencies = [
  "axfs_vfs 0.1.1 (git+https://github.com/Ressed/axfs_crates.git)",
  "log",
@@ -441,7 +441,7 @@ dependencies = [
 [[package]]
 name = "axfs_ramfs"
 version = "0.1.1"
-source = "git+https://github.com/Ressed/axfs_crates.git#b0b52712b9395458b9590b055f3410ae2d8ff75b"
+source = "git+https://github.com/Ressed/axfs_crates.git#0f38e66eaaf3de99a745270189955b5c13bf4ce0"
 dependencies = [
  "axfs_vfs 0.1.1 (git+https://github.com/Ressed/axfs_crates.git)",
  "log",
@@ -462,7 +462,7 @@ dependencies = [
 [[package]]
 name = "axfs_vfs"
 version = "0.1.1"
-source = "git+https://github.com/Ressed/axfs_crates.git#b0b52712b9395458b9590b055f3410ae2d8ff75b"
+source = "git+https://github.com/Ressed/axfs_crates.git#0f38e66eaaf3de99a745270189955b5c13bf4ce0"
 dependencies = [
  "axerrno",
  "bitflags 2.9.0",
