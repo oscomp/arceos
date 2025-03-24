@@ -129,15 +129,40 @@ impl VfsNodeOps for FileWrapper {
         };
         let blocks = (size + (BLOCK_SIZE as u64 - 1)) / BLOCK_SIZE as u64;
 
+        let mut atime: u32 = 0;
+        let mut mtime: u32 = 0;
+        let path = file.get_path().into_raw();
+        _ = unsafe { lwext4_rust::bindings::ext4_atime_get(path, &mut atime) };
+        _ = unsafe { lwext4_rust::bindings::ext4_mtime_get(path, &mut mtime) };
+
+        let mut ret = VfsNodeAttr::new(perm, vtype, size, blocks);
+        ret.set_atime(atime as _);
+        ret.set_mtime(mtime as _);
         info!(
-            "get_attr of {:?} {:?}, size: {}, blocks: {}",
+            "get_attr of {:?} {:?}, size: {}, blocks: {}, atime: {}, mtime: {}",
             vtype,
             file.get_path(),
             size,
-            blocks
+            blocks,
+            atime,
+            mtime
         );
 
-        Ok(VfsNodeAttr::new(perm, vtype, size, blocks))
+        Ok(ret)
+    }
+
+    fn set_atime(&self, atime: usize) -> VfsResult {
+        let file = self.0.lock();
+        let path = file.get_path().into_raw();
+        unsafe { lwext4_rust::bindings::ext4_atime_set(path, atime as _) };
+        Ok(())
+    }
+
+    fn set_mtime(&self, mtime: usize) -> VfsResult {
+        let file = self.0.lock();
+        let path = file.get_path().into_raw();
+        unsafe { lwext4_rust::bindings::ext4_mtime_set(path, mtime as _) };
+        Ok(())
     }
 
     fn create(&self, path: &str, ty: VfsNodeType) -> VfsResult {
