@@ -280,9 +280,12 @@ impl File {
         self.access_node(Cap::empty())?.get_attr()
     }
 
+    /// Set the access time of the file.
     pub fn set_atime(&self, atime: usize) -> AxResult {
         self.access_node(Cap::empty())?.set_atime(atime)
     }
+
+    /// Set the modified time of the file.
     pub fn set_mtime(&self, mtime: usize) -> AxResult {
         self.access_node(Cap::empty())?.set_mtime(mtime)
     }
