@@ -30,6 +30,10 @@ syscall_entry:
     mov     rdi, rsp
     call    x86_syscall_handler
 
+    mov     rdi, rsp
+    mov     rsi, 1 // is_user
+    call    any_trap_handler
+
     pop     rax
     pop     rcx
     pop     rdx

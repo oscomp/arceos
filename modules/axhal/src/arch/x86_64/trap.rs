@@ -56,6 +56,12 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
     }
+    any_trap_handler(tf, tf.is_user());
+}
+
+#[unsafe(no_mangle)]
+fn any_trap_handler(tf: &mut TrapFrame, is_user: bool) {
+    handle_trap!(ANY_TRAP, tf, is_user);
 }
 
 fn vec_to_str(vec: u64) -> &'static str {

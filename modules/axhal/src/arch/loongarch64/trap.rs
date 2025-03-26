@@ -69,4 +69,6 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             );
         }
     }
+
+    handle_trap!(ANY_TRAP, tf, from_user);
 }
