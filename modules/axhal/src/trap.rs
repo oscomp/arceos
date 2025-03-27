@@ -16,14 +16,14 @@ pub static IRQ: [fn(usize) -> bool];
 #[def_trap_handler]
 pub static PAGE_FAULT: [fn(VirtAddr, MappingFlags, bool) -> bool];
 
-/// A slice of handlers to be invoked after a trap.
-#[def_trap_handler]
-pub static POST_TRAP: [fn(&mut TrapFrame, bool)];
-
 /// A slice of syscall handler functions.
 #[cfg(feature = "uspace")]
 #[def_trap_handler]
 pub static SYSCALL: [fn(&mut TrapFrame, usize) -> isize];
+
+/// A slice of callbacks to be invoked after a trap.
+#[linkme::distributed_slice]
+pub static POST_TRAP: [fn(&mut TrapFrame, bool)];
 
 #[allow(unused_macros)]
 macro_rules! handle_trap {
@@ -42,9 +42,9 @@ macro_rules! handle_trap {
 }
 
 #[unsafe(no_mangle)]
-pub(crate) fn post_trap_handler(tf: &mut TrapFrame, from_user: bool) {
-    for handler in crate::trap::POST_TRAP.iter() {
-        handler(tf, from_user);
+pub(crate) fn post_trap_callback(tf: &mut TrapFrame, from_user: bool) {
+    for cb in crate::trap::POST_TRAP.iter() {
+        cb(tf, from_user);
     }
 }
 

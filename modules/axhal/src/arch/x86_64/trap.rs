@@ -56,7 +56,7 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
     }
-    crate::trap::post_trap_handler(tf, tf.is_user());
+    crate::trap::post_trap_callback(tf, tf.is_user());
 }
 
 fn vec_to_str(vec: u64) -> &'static str {
