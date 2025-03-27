@@ -32,7 +32,7 @@ syscall_entry:
 
     mov     rdi, rsp
     mov     rsi, 1 // is_user
-    call    any_trap_handler
+    call    handle_any_trap
 
     pop     rax
     pop     rcx

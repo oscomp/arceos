@@ -39,7 +39,7 @@ fn invalid_exception(tf: &TrapFrame, kind: TrapKind, source: TrapSource) {
 #[unsafe(no_mangle)]
 fn handle_irq_exception(tf: &mut TrapFrame, source: TrapSource) {
     handle_trap!(IRQ, 0);
-    handle_trap!(ANY_TRAP, tf, source as u8 >= 2);
+    crate::trap::handle_any_trap(tf, source as u8 >= 2);
 }
 
 fn handle_instruction_abort(tf: &TrapFrame, iss: u64, is_user: bool) {
@@ -121,5 +121,5 @@ fn handle_sync_exception(tf: &mut TrapFrame, source: TrapSource) {
             );
         }
     }
-    handle_trap!(ANY_TRAP, tf, source as u8 >= 2);
+    crate::trap::handle_any_trap(tf, source as u8 >= 2);
 }
