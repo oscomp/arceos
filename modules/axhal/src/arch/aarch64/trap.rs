@@ -27,6 +27,11 @@ enum TrapSource {
     LowerAArch64 = 2,
     LowerAArch32 = 3,
 }
+impl TrapSource {
+    fn is_from_user(&self) -> bool {
+        matches!(self, TrapSource::LowerAArch64 | TrapSource::LowerAArch32)
+    }
+}
 
 #[unsafe(no_mangle)]
 fn invalid_exception(tf: &TrapFrame, kind: TrapKind, source: TrapSource) {
@@ -39,7 +44,7 @@ fn invalid_exception(tf: &TrapFrame, kind: TrapKind, source: TrapSource) {
 #[unsafe(no_mangle)]
 fn handle_irq_exception(tf: &mut TrapFrame, source: TrapSource) {
     handle_trap!(IRQ, 0);
-    crate::trap::post_trap_handler(tf, source as u8 >= 2);
+    crate::trap::post_trap_handler(tf, source.is_from_user());
 }
 
 fn handle_instruction_abort(tf: &TrapFrame, iss: u64, is_user: bool) {
@@ -121,5 +126,5 @@ fn handle_sync_exception(tf: &mut TrapFrame, source: TrapSource) {
             );
         }
     }
-    crate::trap::post_trap_handler(tf, source as u8 >= 2);
+    crate::trap::post_trap_handler(tf, source.is_from_user());
 }
