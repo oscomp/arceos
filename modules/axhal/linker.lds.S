@@ -96,8 +96,8 @@ SECTIONS {
     linkm2_PAGE_FAULT : { *(linkm2_PAGE_FAULT) }
     linkme_SYSCALL : { *(linkme_SYSCALL) }
     linkm2_SYSCALL : { *(linkm2_SYSCALL) }
-    linkme_ANY_TRAP : { *(linkme_ANY_TRAP) }
-    linkm2_ANY_TRAP : { *(linkm2_ANY_TRAP) }
+    linkme_POST_TRAP : { *(linkme_POST_TRAP) }
+    linkm2_POST_TRAP : { *(linkm2_POST_TRAP) }
     axns_resource : { *(axns_resource) }
 }
 INSERT AFTER .tbss;
