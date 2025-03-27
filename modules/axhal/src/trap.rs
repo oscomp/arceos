@@ -18,7 +18,7 @@ pub static PAGE_FAULT: [fn(VirtAddr, MappingFlags, bool) -> bool];
 
 /// A slice of abitrary trap handlers.
 #[def_trap_handler]
-pub static ANY_TRAP: [fn(&mut TrapFrame, bool) -> bool];
+pub static ANY_TRAP: [fn(&mut TrapFrame, bool)];
 
 /// A slice of syscall handler functions.
 #[cfg(feature = "uspace")]
@@ -39,6 +39,13 @@ macro_rules! handle_trap {
             false
         }
     }}
+}
+
+#[unsafe(no_mangle)]
+pub(crate) fn handle_any_trap(tf: &mut TrapFrame, from_user: bool) {
+    for handler in crate::trap::ANY_TRAP.iter() {
+        handler(tf, from_user);
+    }
 }
 
 /// Call the external syscall handler.
