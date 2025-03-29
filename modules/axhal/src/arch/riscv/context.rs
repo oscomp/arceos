@@ -341,6 +341,7 @@ impl TaskContext {
 unsafe extern "C" fn save_fp_registers(_fp_registers: &mut [u64; 32]) {
     naked_asm!(
         "
+        .attribute arch, \"rv64gc\"
         fsd f0,  0 * 8(a0)
         fsd f1,  1 * 8(a0)
         fsd f2,  2 * 8(a0)
@@ -383,6 +384,7 @@ unsafe extern "C" fn save_fp_registers(_fp_registers: &mut [u64; 32]) {
 unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
     naked_asm!(
         "
+        .attribute arch, \"rv64gc\"
         fld f0,  0 * 8(a0)
         fld f1,  1 * 8(a0)
         fld f2,  2 * 8(a0)
