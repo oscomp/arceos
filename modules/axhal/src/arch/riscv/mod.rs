@@ -2,6 +2,7 @@
 mod macros;
 
 mod context;
+mod csr;
 mod trap;
 
 use memory_addr::{PhysAddr, VirtAddr};
