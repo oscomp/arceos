@@ -1,4 +1,4 @@
-/// Bit manipulation utilities
+//! Bit manipulation utilities
 
 /// Set the bit at the specified position to 1.
 #[inline]

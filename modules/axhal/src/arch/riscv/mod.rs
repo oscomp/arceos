@@ -2,8 +2,8 @@
 mod macros;
 
 mod context;
-mod trap;
 mod csr;
+mod trap;
 
 use memory_addr::{PhysAddr, VirtAddr};
 use riscv::asm;

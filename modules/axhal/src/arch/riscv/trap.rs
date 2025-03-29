@@ -60,7 +60,7 @@ fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             Trap::Exception(E::IllegalInstruction) => {
                 panic!(
                     "Illegal instruction @ addr {:#x}, instruction={:#x}:, from_user={}\n{:#x?}",
-                    tf.sepc, stval, from_user,tf
+                    tf.sepc, stval, from_user, tf
                 );
             }
             _ => {

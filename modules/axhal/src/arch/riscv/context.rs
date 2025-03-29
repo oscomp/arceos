@@ -303,7 +303,9 @@ impl TaskContext {
             // save the current task's FP state
             if current_fp == FS::Dirty {
                 // we need to save the current task's FP state
-                unsafe { save_fp_registers(&mut self.fp_status.fp); }
+                unsafe {
+                    save_fp_registers(&mut self.fp_status.fp);
+                }
                 // after saving, we set the FP state to clean
                 self.fp_status.fs = FS::Clean;
             }
@@ -330,9 +332,7 @@ impl TaskContext {
             }
         }
 
-        unsafe {
-            context_switch(self, next_ctx)
-        }
+        unsafe { context_switch(self, next_ctx) }
     }
 }
 
@@ -414,7 +414,8 @@ unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
         fld f30,30 * 8(a0)
         fld f31,31 * 8(a0)
         ret
-    ")
+    "
+    )
 }
 
 #[naked]
