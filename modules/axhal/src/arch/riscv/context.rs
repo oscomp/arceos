@@ -1,3 +1,4 @@
+use crate::arch::riscv::csr::{CsrSstatus, FS};
 use core::arch::naked_asm;
 use memory_addr::VirtAddr;
 
@@ -37,6 +38,16 @@ pub struct GeneralRegisters {
     pub t4: usize,
     pub t5: usize,
     pub t6: usize,
+}
+
+/// Floating-point registers of RISC-V.
+#[cfg(feature = "fp_simd")]
+#[repr(C)]
+#[derive(Debug, Default, Clone, Copy)]
+pub struct FpStatus {
+    /// the state of the RISC-V Floating-Point Unit (FPU)
+    pub fs: FS,
+    pub fp: [u64; 32],
 }
 
 /// Saved registers when a trap (interrupt or exception) occurs.
@@ -97,10 +108,12 @@ impl UspaceContext {
     /// Creates a new context with the given entry point, user stack pointer,
     /// and the argument.
     pub fn new(entry: usize, ustack_top: VirtAddr, arg0: usize) -> Self {
-        const SPIE: usize = 1 << 5;
-        const SUM: usize = 1 << 18;
-        // enable floating point unit for user space
-        const FS: usize = 1 << 13;
+        let mut sstatus = CsrSstatus::new();
+        sstatus.set_spie(true);
+        sstatus.set_sum(true);
+        #[cfg(feature = "fp_simd")]
+        sstatus.set_fs(FS::Initial);
+
         Self(TrapFrame {
             regs: GeneralRegisters {
                 a0: arg0,
@@ -108,7 +121,7 @@ impl UspaceContext {
                 ..Default::default()
             },
             sepc: entry,
-            sstatus: SPIE | SUM | FS,
+            sstatus: sstatus.into(),
         })
     }
 
@@ -222,7 +235,8 @@ pub struct TaskContext {
     /// The `satp` register value, i.e., the page table root.
     #[cfg(feature = "uspace")]
     pub satp: memory_addr::PhysAddr,
-    // TODO: FP states
+    #[cfg(feature = "fp_simd")]
+    pub fp_status: FpStatus,
 }
 
 impl TaskContext {
@@ -237,6 +251,11 @@ impl TaskContext {
         Self {
             #[cfg(feature = "uspace")]
             satp: crate::paging::kernel_page_table_root(),
+            #[cfg(feature = "fp_simd")]
+            fp_status: FpStatus {
+                fs: FS::Initial,
+                ..Default::default()
+            },
             ..Default::default()
         }
     }
@@ -276,11 +295,126 @@ impl TaskContext {
                 super::write_page_table_root(next_ctx.satp);
             }
         }
+        #[cfg(feature = "fp_simd")]
+        {
+            // get the real FP state of the current task
+            let mut current_sstatus = CsrSstatus::read();
+            let current_fp = current_sstatus.get_fs();
+            // save the current task's FP state
+            if current_fp == FS::Dirty {
+                // we need to save the current task's FP state
+                unsafe { save_fp_registers(&mut self.fp_status.fp); }
+                // after saving, we set the FP state to clean
+                self.fp_status.fs = FS::Clean;
+            }
+            // restore the next task's FP state
+            match next_ctx.fp_status.fs {
+                FS::Clean => {
+                    // the next task's FP state is clean, we should restore it
+                    unsafe { restore_fp_registers(&next_ctx.fp_status.fp) };
+                    // after restoring, we set the FP state
+                    current_sstatus.set_fs(FS::Clean);
+                    current_sstatus.save();
+                }
+                FS::Initial => {
+                    // no need to restore the FP state
+                    // we set the FP state to initial
+                    current_sstatus.set_fs(FS::Initial);
+                    current_sstatus.save();
+                }
+                FS::Dirty => {
+                    // should not happen, since we set FS to Clean after saving
+                    panic!("FP state of the next task should not be dirty");
+                }
+                _ => {}
+            }
+        }
+
         unsafe {
-            // TODO: switch FP states
             context_switch(self, next_ctx)
         }
     }
+}
+
+#[naked]
+unsafe extern "C" fn save_fp_registers(_fp_registers: &mut [u64; 32]) {
+    naked_asm!(
+        "
+        fsd f0,  0 * 8(a0)
+        fsd f1,  1 * 8(a0)
+        fsd f2,  2 * 8(a0)
+        fsd f3,  3 * 8(a0)
+        fsd f4,  4 * 8(a0)
+        fsd f5,  5 * 8(a0)
+        fsd f6,  6 * 8(a0)
+        fsd f7,  7 * 8(a0)
+        fsd f8,  8 * 8(a0)
+        fsd f9,  9 * 8(a0)
+        fsd f10, 10 * 8(a0)
+        fsd f11, 11 * 8(a0)
+        fsd f12, 12 * 8(a0)
+        fsd f13, 13 * 8(a0)
+        fsd f14, 14 * 8(a0)
+        fsd f15, 15 * 8(a0)
+        fsd f16, 16 * 8(a0)
+        fsd f17, 17 * 8(a0)
+        fsd f18, 18 * 8(a0)
+        fsd f19, 19 * 8(a0)
+        fsd f20, 20 * 8(a0)
+        fsd f21, 21 * 8(a0)
+        fsd f22, 22 * 8(a0)
+        fsd f23, 23 * 8(a0)
+        fsd f24, 24 * 8(a0)
+        fsd f25, 25 * 8(a0)
+        fsd f26, 26 * 8(a0)
+        fsd f27, 27 * 8(a0)
+        fsd f28, 28 * 8(a0)
+        fsd f29, 29 * 8(a0)
+        fsd f30, 30 * 8(a0)
+        fsd f31, 31 * 8(a0)
+        ret
+        "
+    )
+}
+
+#[naked]
+unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
+    naked_asm!(
+        "
+        fld f0,  0 * 8(a0)
+        fld f1,  1 * 8(a0)
+        fld f2,  2 * 8(a0)
+        fld f3,  3 * 8(a0)
+        fld f4,  4 * 8(a0)
+        fld f5,  5 * 8(a0)
+        fld f6,  6 * 8(a0)
+        fld f7,  7 * 8(a0)
+        fld f8,  8 * 8(a0)
+        fld f9,  9 * 8(a0)
+        fld f10,10 * 8(a0)
+        fld f11,11 * 8(a0)
+        fld f12,12 * 8(a0)
+        fld f13,13 * 8(a0)
+        fld f14,14 * 8(a0)
+        fld f15,15 * 8(a0)
+        fld f16,16 * 8(a0)
+        fld f17,17 * 8(a0)
+        fld f18,18 * 8(a0)
+        fld f19,19 * 8(a0)
+        fld f20,20 * 8(a0)
+        fld f21,21 * 8(a0)
+        fld f22,22 * 8(a0)
+        fld f23,23 * 8(a0)
+        fld f24,24 * 8(a0)
+        fld f25,25 * 8(a0)
+        fld f26,26 * 8(a0)
+        fld f27,27 * 8(a0)
+        fld f28,28 * 8(a0)
+        fld f29,29 * 8(a0)
+        fld f30,30 * 8(a0)
+        fld f31,31 * 8(a0)
+        ret
+    ")
 }
 
 #[naked]
