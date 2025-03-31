@@ -123,8 +123,7 @@ macro_rules! include_fp_asm_macros {
                 fmv.d.x f31, x0
             .endm
 
-            .endif  // FP_MACROS_FLAG
-        "#
+            .endif"#
         )
     };
 }
