@@ -80,8 +80,45 @@ macro_rules! include_fp_asm_macros {
         .macro PUSH_FLOAT_REGS, base
             PUSH_POP_FLOAT_REGS fsd, \base
         .endm
+
         .macro POP_FLOAT_REGS, base
             PUSH_POP_FLOAT_REGS fld, \base
+        .endm
+
+        .macro CLEAR_FLOAT_REGS, base
+            fmv.d.x f0, x0
+            fmv.d.x f1, x0
+            fmv.d.x f2, x0
+            fmv.d.x f3, x0
+            fmv.d.x f4, x0
+            fmv.d.x f5, x0
+            fmv.d.x f5, x0
+            fmv.d.x f6, x0
+            fmv.d.x f7, x0
+            fmv.d.x f8, x0
+            fmv.d.x f9, x0
+            fmv.d.x f10, x0
+            fmv.d.x f11, x0
+            fmv.d.x f12, x0
+            fmv.d.x f13, x0
+            fmv.d.x f14, x0
+            fmv.d.x f15, x0
+            fmv.d.x f16, x0
+            fmv.d.x f17, x0
+            fmv.d.x f18, x0
+            fmv.d.x f19, x0
+            fmv.d.x f20, x0
+            fmv.d.x f21, x0
+            fmv.d.x f22, x0
+            fmv.d.x f23, x0
+            fmv.d.x f24, x0
+            fmv.d.x f25, x0
+            fmv.d.x f26, x0
+            fmv.d.x f27, x0
+            fmv.d.x f28, x0
+            fmv.d.x f29, x0
+            fmv.d.x f30, x0
+            fmv.d.x f31, x0
         .endm
 
         .endif  // FP_MACROS_FLAG

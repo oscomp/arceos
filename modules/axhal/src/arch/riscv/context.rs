@@ -337,7 +337,8 @@ impl TaskContext {
                     sstatus::set_fs(FS::Clean);
                 },
                 FS::Initial => unsafe {
-                    // no need to restore the FP state
+                    // restore the FP state as constant values(all 0)
+                    clear_fp_registers();
                     // we set the FP state to initial
                     sstatus::set_fs(FS::Initial);
                 },
@@ -372,6 +373,17 @@ unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
         include_fp_asm_macros!(),
         "
         POP_FLOAT_REGS a0
+        ret
+        "
+    )
+}
+
+#[cfg(feature = "fp_simd")]
+unsafe extern "C" fn clear_fp_registers() {
+    naked_asm!(
+        include_fp_asm_macros!(),
+        "
+        CLEAR_FLOAT_REGS
         ret
         "
     )
