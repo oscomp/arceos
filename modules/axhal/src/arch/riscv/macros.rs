@@ -81,14 +81,10 @@ macro_rules! include_fp_asm_macros {
 
             .macro PUSH_FLOAT_REGS, base
                 PUSH_POP_FLOAT_REGS fsd, \base
-                frcsr t0
-                STR t0, \base, 32
             .endm
 
             .macro POP_FLOAT_REGS, base
                 PUSH_POP_FLOAT_REGS fld, \base
-                LDR t0, \base, 32
-                fscsr x0, t0
             .endm
 
             .macro CLEAR_FLOAT_REGS, base

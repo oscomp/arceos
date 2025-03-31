@@ -1,8 +1,6 @@
 use core::arch::naked_asm;
 use memory_addr::VirtAddr;
 #[cfg(feature = "fp_simd")]
-use riscv::register::sstatus;
-#[cfg(feature = "fp_simd")]
 use riscv::register::sstatus::FS;
 
 /// General registers of RISC-V.
@@ -59,7 +57,8 @@ impl Default for FpStatus {
     fn default() -> Self {
         Self {
             fs: FS::Initial,
-            ..Default::default()
+            fp: [0; 32],
+            fcsr: 0,
         }
     }
 }
@@ -142,7 +141,7 @@ impl UspaceContext {
                 ..Default::default()
             },
             sepc: entry,
-            sstatus: sstatus.into(),
+            sstatus,
         })
     }
 
@@ -318,6 +317,8 @@ impl TaskContext {
         }
         #[cfg(feature = "fp_simd")]
         {
+            use riscv::register::sstatus;
+            use riscv::register::sstatus::FS;
             // get the real FP state of the current task
             let current_fs = sstatus::read().fs();
             // save the current task's FP state
@@ -362,6 +363,8 @@ unsafe extern "C" fn save_fp_registers(_fp_registers: &mut [u64; 32]) {
         include_fp_asm_macros!(),
         "
         PUSH_FLOAT_REGS a0
+        frcsr t0
+        STR t0, a0, 32
         ret
         "
     )
@@ -374,6 +377,8 @@ unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
         include_fp_asm_macros!(),
         "
         POP_FLOAT_REGS a0
+        LDR t0, a0, 32
+        fscsr x0, t0
         ret
         "
     )
