@@ -36,7 +36,6 @@ fn handle_page_fault(tf: &TrapFrame, mut access_flags: MappingFlags, is_user: bo
 #[unsafe(no_mangle)]
 fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     let scause = scause::read();
-    let stval = stval::read();
     if let Ok(cause) = scause.cause().try_into::<I, E>() {
         match cause {
             #[cfg(feature = "uspace")]

@@ -49,8 +49,9 @@ pub struct GeneralRegisters {
 #[derive(Debug, Clone, Copy)]
 pub struct FpStatus {
     /// the state of the RISC-V Floating-Point Unit (FPU)
-    pub fs: FS,
     pub fp: [u64; 32],
+    pub fcsr: usize,
+    pub fs: FS,
 }
 
 #[cfg(feature = "fp_simd")]
@@ -58,7 +59,7 @@ impl Default for FpStatus {
     fn default() -> Self {
         Self {
             fs: FS::Initial,
-            fp: [0; 32],
+            .. Default::default()
         }
     }
 }
@@ -379,6 +380,7 @@ unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
 }
 
 #[cfg(feature = "fp_simd")]
+#[naked]
 unsafe extern "C" fn clear_fp_registers() {
     naked_asm!(
         include_fp_asm_macros!(),
