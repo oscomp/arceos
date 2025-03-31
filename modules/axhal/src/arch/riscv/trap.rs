@@ -57,12 +57,6 @@ fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             Trap::Interrupt(_) => {
                 handle_trap!(IRQ, scause.bits());
             }
-            Trap::Exception(E::IllegalInstruction) => {
-                panic!(
-                    "Illegal instruction @ addr {:#x}, instruction={:#x}:, from_user={}\n{:#x?}",
-                    tf.sepc, stval, from_user, tf
-                );
-            }
             _ => {
                 panic!("Unhandled trap {:?} @ {:#x}:\n{:#x?}", cause, tf.sepc, tf);
             }

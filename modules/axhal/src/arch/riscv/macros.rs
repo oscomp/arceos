@@ -35,7 +35,7 @@ macro_rules! __asm_macros {
 }
 
 #[cfg(feature = "fp_simd")]
-macro_rules! fp_asm_macros {
+macro_rules! include_fp_asm_macros {
     () => {
         r#"
         .ifndef FP_MACROS_FLAG
@@ -89,13 +89,6 @@ macro_rules! fp_asm_macros {
     };
 }
 
-#[cfg(not(feature = "fp_simd"))]
-macro_rules! fp_asm_macros {
-    () => {
-        ""
-    };
-}
-
 macro_rules! include_asm_macros {
     () => {
         concat!(
@@ -142,8 +135,7 @@ macro_rules! include_asm_macros {
                 PUSH_POP_GENERAL_REGS LDR
             .endm
 
-            .endif",
-            fp_asm_macros!()
+            .endif"
         )
     };
 }

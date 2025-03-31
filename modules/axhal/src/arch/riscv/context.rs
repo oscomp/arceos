@@ -5,7 +5,6 @@ use riscv::register::sstatus;
 #[cfg(feature = "fp_simd")]
 use riscv::register::sstatus::FS;
 
-
 /// General registers of RISC-V.
 #[allow(missing_docs)]
 #[repr(C)]
@@ -123,7 +122,6 @@ impl UspaceContext {
     /// and the argument.
     pub fn new(entry: usize, ustack_top: VirtAddr, arg0: usize) -> Self {
         const BIT_SPIE: usize = 5;
-        const BIT_FS: usize = 13;
         const BIT_SUM: usize = 18;
 
         let mut sstatus: usize = 0;
@@ -132,6 +130,7 @@ impl UspaceContext {
         #[cfg(feature = "fp_simd")]
         {
             // set the initial state of the FPU
+            const BIT_FS: usize = 13;
             sstatus |= (FS::Initial as usize) << BIT_FS;
         }
 
@@ -358,7 +357,7 @@ impl TaskContext {
 #[naked]
 unsafe extern "C" fn save_fp_registers(_fp_registers: &mut [u64; 32]) {
     naked_asm!(
-        include_asm_macros!(),
+        include_fp_asm_macros!(),
         "
         PUSH_FLOAT_REGS a0
         ret
@@ -370,7 +369,7 @@ unsafe extern "C" fn save_fp_registers(_fp_registers: &mut [u64; 32]) {
 #[naked]
 unsafe extern "C" fn restore_fp_registers(_fp_registers: &[u64; 32]) {
     naked_asm!(
-        include_asm_macros!(),
+        include_fp_asm_macros!(),
         "
         POP_FLOAT_REGS a0
         ret
