@@ -1,7 +1,10 @@
 use core::arch::naked_asm;
 use memory_addr::VirtAddr;
+#[cfg(feature = "fp_simd")]
 use riscv::register::sstatus;
+#[cfg(feature = "fp_simd")]
 use riscv::register::sstatus::FS;
+
 
 /// General registers of RISC-V.
 #[allow(missing_docs)]
@@ -51,6 +54,7 @@ pub struct FpStatus {
     pub fp: [u64; 32],
 }
 
+#[cfg(feature = "fp_simd")]
 impl Default for FpStatus {
     fn default() -> Self {
         Self {

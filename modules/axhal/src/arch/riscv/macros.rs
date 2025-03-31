@@ -93,7 +93,7 @@ macro_rules! fp_asm_macros {
 macro_rules! fp_asm_macros {
     () => {
         ""
-    }
+    };
 }
 
 macro_rules! include_asm_macros {
