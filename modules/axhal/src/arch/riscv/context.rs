@@ -59,7 +59,7 @@ impl Default for FpStatus {
     fn default() -> Self {
         Self {
             fs: FS::Initial,
-            .. Default::default()
+            ..Default::default()
         }
     }
 }
