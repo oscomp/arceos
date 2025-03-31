@@ -34,6 +34,68 @@ macro_rules! __asm_macros {
     };
 }
 
+#[cfg(feature = "fp_simd")]
+macro_rules! fp_asm_macros {
+    () => {
+        r#"
+        .ifndef FP_MACROS_FLAG
+        .equ FP_MACROS_FLAG, 1
+
+        .macro PUSH_POP_FLOAT_REGS, op, base
+            .attribute arch, "rv64gc"
+            \op f0, 0 * 8(\base)
+            \op f1, 1 * 8(\base)
+            \op f2, 2 * 8(\base)
+            \op f3, 3 * 8(\base)
+            \op f4, 4 * 8(\base)
+            \op f5, 5 * 8(\base)
+            \op f6, 6 * 8(\base)
+            \op f7, 7 * 8(\base)
+            \op f8, 8 * 8(\base)
+            \op f9, 9 * 8(\base)
+            \op f10, 10 * 8(\base)
+            \op f11, 11 * 8(\base)
+            \op f12, 12 * 8(\base)
+            \op f13, 13 * 8(\base)
+            \op f14, 14 * 8(\base)
+            \op f15, 15 * 8(\base)
+            \op f16, 16 * 8(\base)
+            \op f17, 17 * 8(\base)
+            \op f18, 18 * 8(\base)
+            \op f19, 19 * 8(\base)
+            \op f20, 20 * 8(\base)
+            \op f21, 21 * 8(\base)
+            \op f22, 22 * 8(\base)
+            \op f23, 23 * 8(\base)
+            \op f24, 24 * 8(\base)
+            \op f25, 25 * 8(\base)
+            \op f26, 26 * 8(\base)
+            \op f27, 27 * 8(\base)
+            \op f28, 28 * 8(\base)
+            \op f29, 29 * 8(\base)
+            \op f30, 30 * 8(\base)
+            \op f31, 31 * 8(\base)
+        .endm
+
+        .macro PUSH_FLOAT_REGS, base
+            PUSH_POP_FLOAT_REGS fsd, \base
+        .endm
+        .macro POP_FLOAT_REGS, base
+            PUSH_POP_FLOAT_REGS fld, \base
+        .endm
+
+        .endif  // FP_MACROS_FLAG
+        "#
+    };
+}
+
+#[cfg(not(feature = "fp_simd"))]
+macro_rules! fp_asm_macros {
+    () => {
+        ""
+    }
+}
+
 macro_rules! include_asm_macros {
     () => {
         concat!(
@@ -80,7 +142,8 @@ macro_rules! include_asm_macros {
                 PUSH_POP_GENERAL_REGS LDR
             .endm
 
-            .endif"
+            .endif",
+            fp_asm_macros!()
         )
     };
 }

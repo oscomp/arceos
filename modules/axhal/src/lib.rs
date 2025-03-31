@@ -53,7 +53,6 @@ pub mod tls;
 #[cfg(feature = "irq")]
 pub mod irq;
 
-pub mod bin_utils;
 #[cfg(feature = "paging")]
 pub mod paging;
 
