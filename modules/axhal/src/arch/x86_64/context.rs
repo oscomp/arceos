@@ -129,12 +129,12 @@ impl TrapFrame {
         self.rax = rax as _;
     }
 
-    /// Sets the return address.
+    /// Push the return address.
     ///
     /// On x86_64, return address is stored in stack, so we need to modify the
     /// stack in order to change the return address. This function uses a
     /// separate name (rather than `set_ra`) to avoid confusion and misuse.
-    pub fn write_ra(&mut self, addr: usize) {
+    pub fn push_ra(&mut self, addr: usize) {
         self.rsp -= 8;
         unsafe {
             core::ptr::write(self.rsp as *mut usize, addr);
