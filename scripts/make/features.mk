@@ -11,6 +11,8 @@
 #   - `LIB_FEAT`: features to be enabled for the user library (crate `axstd`, `axlibc`).
 #   - `APP_FEAT`: features to be enabled for the Rust app.
 
+PLATFORM_FAMILY ?=
+
 ifeq ($(APP_TYPE),c)
   ax_feat_prefix := axfeat/
   lib_feat_prefix := axlibc/
@@ -27,6 +29,12 @@ override FEATURES := $(shell echo $(FEATURES) | tr ',' ' ')
 ifeq ($(APP_TYPE), c)
   ifneq ($(wildcard $(APP)/features.txt),)    # check features.txt exists
     override FEATURES += $(shell cat $(APP)/features.txt)
+  endif
+  # Add `fp_simd` features defaultly for aarch64 when building C apps
+  ifeq ($(ARCH),aarch64)
+    ifeq ($(filter fp_simd,$(FEATURES)),)
+      override FEATURES += fp_simd
+    endif
   endif
   ifneq ($(filter fs net pipe select epoll,$(FEATURES)),)
     override FEATURES += fd
@@ -58,3 +66,8 @@ lib_feat += $(filter $(lib_features),$(FEATURES))
 AX_FEAT := $(strip $(addprefix $(ax_feat_prefix),$(ax_feat)))
 LIB_FEAT := $(strip $(addprefix $(lib_feat_prefix),$(lib_feat)))
 APP_FEAT := $(strip $(shell echo $(APP_FEATURES) | tr ',' ' '))
+ifeq ($(PLAT_FAMILY),)
+  AXPLAT_FEAT := 
+else
+  AXPLAT_FEAT := axhal_plat_impl/$(PLAT_FAMILY)
+endif

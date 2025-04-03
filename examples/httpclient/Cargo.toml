@@ -8,6 +8,7 @@ authors = ["Yuekai Jia <equation618@gmail.com>", "Dashuai Wu <wudashuaijss@foxma
 
 [dependencies]
 axstd = { workspace = true, features = ["net"], optional = true }
+axhal_plat_impl = { workspace = true, optional = true }
 
 [features]
 default = []

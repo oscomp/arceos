@@ -33,19 +33,21 @@ kernel-aspace-size = "0x0000_ffff_ffff_f000"    # uint
 # Device specifications
 #
 [devices]
-# MMIO regions with format (`base_paddr`, `size`).
-mmio-regions = [
+# MMIO ranges with format (`base_paddr`, `size`).
+mmio-ranges = [
     [0xFE20_1000, 0x1000],      # PL011 UART
     [0xFE34_0000, 0x1000],      # eMMC
     [0xFF84_1000, 0x1000],      # GICv2
 ]                               # [(uint, uint)]
-# VirtIO MMIO regions with format (`base_paddr`, `size`).
-virtio-mmio-regions = []        # [(uint, uint)]
+# VirtIO MMIO ranges with format (`base_paddr`, `size`).
+virtio-mmio-ranges = []        # [(uint, uint)]
 
 # UART Address
 uart-paddr = 0xFE20_1000        # uint
 # UART IRQ number
 uart-irq = 0x79                 # uint
+# Timer interrupt num (PPI, physical).
+timer-irq = 0x1e                # uint
 
 # GIC CPU Interface base address
 gicc-paddr = 0xFF84_2000        # uint

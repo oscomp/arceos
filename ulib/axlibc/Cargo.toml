@@ -23,13 +23,13 @@ crate-type = ["staticlib"]
 default = []
 
 # Multicore
-smp = ["arceos_posix_api/smp"]
+smp = ["arceos_posix_api/smp", "axhal_plat_impl/smp"]
 
 # Floating point/SIMD
-fp_simd = ["axfeat/fp_simd"]
+fp_simd = ["axfeat/fp_simd", "axhal_plat_impl/fp_simd"]
 
 # Interrupts
-irq = ["arceos_posix_api/irq", "axfeat/irq"]
+irq = ["arceos_posix_api/irq", "axfeat/irq", "axhal_plat_impl/irq"]
 
 # Memory
 alloc = ["arceos_posix_api/alloc"]
@@ -55,6 +55,7 @@ axfeat = { workspace = true }
 arceos_posix_api = { workspace = true }
 axio = "0.1"
 axerrno = "0.1"
+axhal_plat_impl = { workspace = true }
 
 [build-dependencies]
 bindgen ={ version = "0.69" }

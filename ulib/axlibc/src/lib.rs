@@ -35,6 +35,8 @@
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
+extern crate axhal_plat_impl;
+
 #[path = "."]
 mod ctypes {
     #[rustfmt::skip]
