@@ -95,8 +95,7 @@ pub unsafe fn set_current_task_ptr<T>(ptr: *const T) {
 
 #[allow(dead_code)]
 pub(crate) fn init_primary(cpu_id: usize) {
-    percpu::init();
-    percpu::init_percpu_reg(cpu_id);
+    // We have call `percpu::init()` in the `axhal_plat` crate.
     unsafe {
         CPU_ID.write_current_raw(cpu_id);
         IS_BSP.write_current_raw(true);
@@ -105,7 +104,6 @@ pub(crate) fn init_primary(cpu_id: usize) {
 
 #[allow(dead_code)]
 pub(crate) fn init_secondary(cpu_id: usize) {
-    percpu::init_percpu_reg(cpu_id);
     unsafe {
         CPU_ID.write_current_raw(cpu_id);
         IS_BSP.write_current_raw(false);

@@ -94,7 +94,7 @@ fn is_init_ok() -> bool {
 /// The main entry point of the ArceOS runtime.
 ///
 /// It is called from the bootstrapping code in the specific platform crate (see
-/// [`axhal_cpu::call_main`]). `cpu_id` is the logic ID of the current CPU, and
+/// [`axhal_plat::call_main`]). `cpu_id` is the logic ID of the current CPU, and
 /// `dtb` is the address of the device tree blob. It finally calls the
 /// application's `main` function after all initialization work is done.
 ///
@@ -253,7 +253,7 @@ fn init_interrupt() {
         unsafe { NEXT_DEADLINE.write_current_raw(deadline + PERIODIC_INTERVAL_NANOS) };
         axhal::time::set_oneshot_timer(deadline);
     }
-
+    info!("IRQ: Timer IRQ = {:#x}", axconfig::devices::TIMER_IRQ);
     axhal::irq::register(axconfig::devices::TIMER_IRQ, || {
         update_timer();
         #[cfg(feature = "multitask")]

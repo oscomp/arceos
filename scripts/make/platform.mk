@@ -37,3 +37,31 @@ else
   endif
   ARCH := $(_arch)
 endif
+
+# General Platform family from $(PLAT_NAME)
+#   - x86_64-pc-oslab: x86-pc
+#   - x86_64-qemu-q35: x86-pc
+#   - riscv64-qemu-virt: riscv64-qemu-virt
+#   - aarch64-qemu-virt: aarch64-qemu-virt
+#   - aarch64-raspi4: aarch64-raspi
+#   - aarch64-bsta1000b: aarch64-bsta1000b
+#   - aarch64-phytium-pi: aarch64-phytium-pi
+#   - other: empty
+
+ifeq ($(PLAT_NAME),x86_64-qemu-q35)
+  PLAT_FAMILY := x86-pc
+else ifeq ($(PLAT_NAME),x86_64-pc-oslab)
+  PLAT_FAMILY := x86-pc
+else ifeq ($(PLAT_NAME),riscv64-qemu-virt)
+  PLAT_FAMILY := riscv64-qemu-virt
+else ifeq ($(PLAT_NAME),aarch64-qemu-virt)
+  PLAT_FAMILY := aarch64-qemu-virt
+else ifeq ($(PLAT_NAME),aarch64-raspi4)
+  PLAT_FAMILY := aarch64-raspi
+else ifeq ($(PLAT_NAME),aarch64-bsta1000b)
+  PLAT_FAMILY := aarch64-bsta1000b
+else ifeq ($(PLAT_NAME),aarch64-phytium-pi)
+  PLAT_FAMILY := aarch64-phytium-pi
+else
+  PLAT_FAMILY :=
+endif

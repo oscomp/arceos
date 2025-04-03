@@ -40,10 +40,10 @@ endif
 _cargo_build: oldconfig
 	@printf "    $(GREEN_C)Building$(END_C) App: $(APP_NAME), Arch: $(ARCH), Platform: $(PLAT_NAME), App type: $(APP_TYPE)\n"
 ifeq ($(APP_TYPE), rust)
-	$(call cargo_build,$(APP),$(AX_FEAT) $(LIB_FEAT) $(APP_FEAT))
+	$(call cargo_build,$(APP),$(AX_FEAT) $(LIB_FEAT) $(APP_FEAT) $(AXPLAT_FEAT))
 	@cp $(rust_elf) $(OUT_ELF)
 else ifeq ($(APP_TYPE), c)
-	$(call cargo_build,ulib/axlibc,$(AX_FEAT) $(LIB_FEAT))
+	$(call cargo_build,ulib/axlibc,$(AX_FEAT) $(LIB_FEAT) $(AXPLAT_FEAT))
 endif
 
 $(OUT_DIR):

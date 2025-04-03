@@ -35,6 +35,8 @@ extern crate log;
 #[macro_use]
 extern crate memory_addr;
 
+extern crate axhal_plat_impl;
+
 pub mod cpu;
 pub mod mem;
 pub mod time;

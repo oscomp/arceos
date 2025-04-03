@@ -8,3 +8,4 @@ authors = ["Yuekai Jia <equation618@gmail.com>"]
 
 [dependencies]
 axstd = { workspace = true, optional = true }
+axhal_plat_impl = { workspace = true, optional = true }

@@ -10,12 +10,12 @@ repository = "https://github.com/arceos-org/arceos/tree/main/modules/axhal"
 documentation = "https://arceos-org.github.io/arceos/axhal/index.html"
 
 [features]
-smp = []
-fp_simd = ["axhal_cpu/fp_simd"]
+smp = ["axhal_plat_impl/smp"]
+fp_simd = ["axhal_cpu/fp_simd", "axhal_plat_impl/fp_simd"]
 paging = ["axalloc", "page_table_multiarch"]
-irq = ["linkme"]
+irq = ["linkme", "axhal_plat_impl/irq"]
 tls = ["axhal_cpu/tls"]
-rtc = []
+rtc = ["axhal_plat_impl/rtc"]
 default = []
 
 [dependencies]
@@ -28,10 +28,11 @@ heapless = "0.8"
 memory_addr = "0.3"
 linkme = { version = "0.3", optional = true }
 page_table_multiarch = { version = "0.5", optional = true }
-axhal_cpu = { git = "https://github.com/arceos-org/axhal_crates.git" }
-axhal_plat = { git = "https://github.com/arceos-org/axhal_crates.git" }
+axhal_cpu = { workspace = true }
+axhal_plat = { workspace = true  }
 axconfig = { workspace = true }
 axalloc = { workspace = true, optional = true }
+axhal_plat_impl = { workspace = true }
 
 [target.'cfg(target_arch = "aarch64")'.dependencies]
 aarch64-cpu = "10.0"

@@ -65,5 +65,9 @@ axsync = { path = "modules/axsync" }
 axtask = { path = "modules/axtask" }
 axdma = { path = "modules/axdma" }
 
+axhal_plat_impl = { git = "https://github.com/oscomp/axhal_crates.git" }
+axhal_cpu = { git = "https://github.com/oscomp/axhal_crates.git" }
+axhal_plat = { git = "https://github.com/oscomp/axhal_crates.git" }
+
 [profile.release]
 lto = true
