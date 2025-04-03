@@ -114,11 +114,6 @@ impl TrapFrame {
         self.rip = rip as _;
     }
 
-    /// Gets the stack pointer.
-    pub const fn sp(&self) -> usize {
-        self.rsp as _
-    }
-
     /// Sets the stack pointer.
     pub const fn set_sp(&mut self, rsp: usize) {
         self.rsp = rsp as _;
