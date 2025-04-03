@@ -114,6 +114,11 @@ impl TrapFrame {
         self.rip = rip as _;
     }
 
+    /// Gets the stack pointer.
+    pub const fn sp(&self) -> usize {
+        self.rsp as _
+    }
+
     /// Sets the stack pointer.
     pub const fn set_sp(&mut self, rsp: usize) {
         self.rsp = rsp as _;
@@ -129,12 +134,12 @@ impl TrapFrame {
         self.rax = rax as _;
     }
 
-    /// Sets the return address.
+    /// Push the return address.
     ///
     /// On x86_64, return address is stored in stack, so we need to modify the
     /// stack in order to change the return address. This function uses a
     /// separate name (rather than `set_ra`) to avoid confusion and misuse.
-    pub fn write_ra(&mut self, addr: usize) {
+    pub fn push_ra(&mut self, addr: usize) {
         self.rsp -= 8;
         unsafe {
             core::ptr::write(self.rsp as *mut usize, addr);
@@ -230,6 +235,22 @@ impl UspaceContext {
                 options(noreturn),
             )
         }
+    }
+}
+
+#[cfg(feature = "uspace")]
+impl core::ops::Deref for UspaceContext {
+    type Target = TrapFrame;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[cfg(feature = "uspace")]
+impl core::ops::DerefMut for UspaceContext {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
