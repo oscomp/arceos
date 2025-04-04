@@ -215,16 +215,6 @@ impl UspaceContext {
         Self(*trap_frame)
     }
 
-    /// Gets the trap frame.
-    pub const fn trap_frame(&self) -> &TrapFrame {
-        &self.0
-    }
-
-    /// Gets the trap frame mutably.
-    pub fn trap_frame_mut(&mut self) -> &mut TrapFrame {
-        &mut self.0
-    }
-
     /// Enters user space.
     ///
     /// It restores the user registers and jumps to the user entry point
