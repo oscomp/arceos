@@ -8,4 +8,7 @@
 
 #![no_std]
 
+#[allow(unused)]
+pub use axhal_plat_impl::config::*;
+
 axconfig_gen_macros::include_configs!(env!("AX_CONFIG_PATH"));

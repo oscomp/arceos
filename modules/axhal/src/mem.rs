@@ -8,7 +8,7 @@ use axhal_plat::mem::{check_sorted_ranges_overlap, ranges_difference};
 
 pub use axhal_plat::mem::{MemRegionFlags, PhysMemRegion};
 pub use axhal_plat::mem::{mmio_ranges, phys_ram_ranges, reserved_phys_ram_ranges, total_ram_size};
-pub use memory_addr::{PhysAddr, PhysAddrRange, VirtAddr, VirtAddrRange, pa, va};
+pub use memory_addr::{PAGE_SIZE_4K, PhysAddr, PhysAddrRange, VirtAddr, VirtAddrRange, pa, va};
 
 const MAX_REGIONS: usize = 128;
 

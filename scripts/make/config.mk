@@ -1,7 +1,7 @@
 # Config generation
 
 config_args := \
-  configs/defconfig.toml $(PLAT_CONFIG) $(EXTRA_CONFIG) \
+  configs/defconfig.toml $(EXTRA_CONFIG) \
   -w 'smp=$(SMP)' \
   -w 'arch="$(ARCH)"' \
   -w 'platform="$(PLAT_NAME)"' \

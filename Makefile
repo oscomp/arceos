@@ -103,6 +103,7 @@ endif
 
 export AX_ARCH=$(ARCH)
 export AX_PLATFORM=$(PLAT_NAME)
+export AX_PLAT_FAMILY=$(PLAT_FAMILY)
 export AX_SMP=$(SMP)
 export AX_MODE=$(MODE)
 export AX_LOG=$(LOG)
