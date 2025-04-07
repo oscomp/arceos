@@ -28,10 +28,10 @@ lazyinit = "0.2"
 cap_access = "0.1"
 axio = { version = "0.1.1", features = ["alloc"] }
 axerrno = "0.1"
-axfs_vfs = "0.1"
+axfs_vfs = { git = "https://github.com/Ressed/axfs_crates.git" }
 spin = "0.9"
-axfs_devfs = { version = "0.1", optional = true }
-axfs_ramfs = { version = "0.1", optional = true }
+axfs_devfs = { git = "https://github.com/Ressed/axfs_crates.git", optional = true }
+axfs_ramfs = { git = "https://github.com/Ressed/axfs_crates.git", optional = true }
 crate_interface = { version = "0.1", optional = true }
 axsync = { workspace = true }
 axdriver = { workspace = true, features = ["block"] }
