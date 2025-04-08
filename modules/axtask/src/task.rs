@@ -122,6 +122,11 @@ impl TaskInner {
 
         t.entry = Some(Box::into_raw(Box::new(entry)));
         t.ctx_mut().init(task_entry as usize, kstack.top(), tls);
+
+        #[cfg(feature = "uspace")]
+        t.ctx_mut()
+            .set_page_table_root(axhal::paging::kernel_page_table_root());
+
         t.kstack = Some(kstack);
         if t.name == "idle" {
             t.is_idle = true;

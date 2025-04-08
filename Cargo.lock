@@ -480,10 +480,12 @@ dependencies = [
 [[package]]
 name = "axhal_cpu"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "cfg-if",
+ "kernel_guard",
+ "lazyinit",
  "linkme",
  "log",
  "loongArch64",
@@ -491,6 +493,7 @@ dependencies = [
  "ns16550a",
  "page_table_entry",
  "page_table_multiarch",
+ "percpu",
  "riscv",
  "static_assertions",
  "tock-registers 0.9.0",
@@ -501,7 +504,7 @@ dependencies = [
 [[package]]
 name = "axhal_plat"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axhal_plat_macros",
  "bitflags 2.9.0",
@@ -513,7 +516,7 @@ dependencies = [
 [[package]]
 name = "axhal_plat_impl"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axplat-aarch64-bsta1000b",
@@ -531,7 +534,7 @@ dependencies = [
 [[package]]
 name = "axhal_plat_macros"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -616,7 +619,7 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-bsta1000b"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_cpu",
@@ -632,7 +635,7 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-common"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "arm_gicv2",
@@ -653,7 +656,7 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-phytium-pi"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_cpu",
@@ -667,7 +670,7 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-qemu-virt"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_cpu",
@@ -680,7 +683,7 @@ dependencies = [
 [[package]]
 name = "axplat-aarch64-raspi"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "aarch64-cpu 10.0.0",
  "axconfig-gen-macros",
@@ -695,7 +698,7 @@ dependencies = [
 [[package]]
 name = "axplat-dummy"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_plat",
@@ -704,7 +707,7 @@ dependencies = [
 [[package]]
 name = "axplat-loongarch64-qemu-virt"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_cpu",
@@ -723,7 +726,7 @@ dependencies = [
 [[package]]
 name = "axplat-riscv64-qemu-virt"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_cpu",
@@ -744,7 +747,7 @@ dependencies = [
 [[package]]
 name = "axplat-x86-pc"
 version = "0.1.0"
-source = "git+https://github.com/oscomp/axhal_crates.git#b0725a6ea0064d13d492bc8c8f59465cf98ab914"
+source = "git+https://github.com/oscomp/axhal_crates.git#ef5bee033edec79836d422cc7113fcc314b628cf"
 dependencies = [
  "axconfig-gen-macros",
  "axhal_cpu",

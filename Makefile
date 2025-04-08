@@ -182,10 +182,18 @@ debug: build
 
 clippy: oldconfig
 ifeq ($(origin ARCH), command line)
+ifeq ($(ARCH),aarch64)
+ifeq ($(filter fp_simd,$(FEATURES)),)
+	$(eval override TARGET = aarch64-unknown-none)
+endif
 	$(call cargo_clippy,--target $(TARGET))
 else
 	$(call cargo_clippy)
 endif
+else
+	$(call cargo_clippy)
+endif
+
 
 doc: oldconfig
 	$(call cargo_doc)

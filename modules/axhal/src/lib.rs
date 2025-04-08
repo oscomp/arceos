@@ -37,7 +37,10 @@ extern crate memory_addr;
 
 extern crate axhal_plat_impl;
 
-pub mod cpu;
+pub mod cpu {
+    //! CPU-related operations.
+    pub use axhal_cpu::cpu::*;
+}
 pub mod mem;
 pub mod time;
 
@@ -74,11 +77,11 @@ pub use axhal_plat::init::{platform_init, platform_init_secondary};
 
 /// Initializes HAL data structures for the primary core.
 pub fn init(cpu_id: usize, _dtb: usize) {
-    self::cpu::init_primary(cpu_id);
+    self::cpu::init_percpu_variable(cpu_id);
     self::mem::init();
 }
 
 /// Initializes HAL data structures for secondary cores.
 pub fn init_secondary(cpu_id: usize) {
-    self::cpu::init_secondary(cpu_id);
+    self::cpu::init_percpu_variable(cpu_id);
 }

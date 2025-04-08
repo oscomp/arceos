@@ -16,6 +16,7 @@ paging = ["axalloc", "page_table_multiarch"]
 irq = ["linkme", "axhal_plat_impl/irq"]
 tls = ["axhal_cpu/tls"]
 rtc = ["axhal_plat_impl/rtc"]
+uspace = ["paging", "axhal_cpu/uspace"]
 default = []
 
 [dependencies]

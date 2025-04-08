@@ -32,7 +32,7 @@ smp = ["kspin/smp"]
 sched_fifo = ["multitask"]
 sched_rr = ["multitask", "preempt"]
 sched_cfs = ["multitask", "preempt"]
-
+uspace = ["axhal/uspace"]
 test = ["percpu?/sp-naive"]
 
 [dependencies]
