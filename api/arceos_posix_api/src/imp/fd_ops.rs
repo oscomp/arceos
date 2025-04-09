@@ -130,6 +130,12 @@ pub fn sys_fcntl(fd: c_int, cmd: c_int, arg: usize) -> c_int {
                 get_file_like(fd)?.set_nonblocking(arg & (ctypes::O_NONBLOCK as usize) > 0)?;
                 Ok(0)
             }
+            ctypes::F_GETFL => match get_file_like(fd)?.stat()?.st_mode & 0o600 {
+                0o400 => Ok(ctypes::O_RDONLY as _),
+                0o200 => Ok(ctypes::O_WRONLY as _),
+                0o600 => Ok(ctypes::O_RDWR as _),
+                _ => Ok(0),
+            },
             _ => {
                 warn!("unsupported fcntl parameters: cmd {}", cmd);
                 Ok(0)
