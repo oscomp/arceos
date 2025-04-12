@@ -201,6 +201,19 @@ impl WaitQueue {
             false
         }
     }
+
+    /// Requeues at most `count` tasks in the wait queue to the target wait queue.
+    ///
+    /// Returns the number of tasks requeued.
+    pub fn requeue(&self, count: usize, target: &WaitQueue) -> usize {
+        let mut wq = self.queue.lock();
+        let mut target_wq = target.queue.lock();
+        let count = count.min(wq.len());
+        for task in wq.drain(..count) {
+            target_wq.push_back(task);
+        }
+        count
+    }
 }
 
 fn unblock_one_task(task: AxTaskRef, resched: bool) {
