@@ -140,6 +140,12 @@ impl TrapFrame {
             core::ptr::write(self.rsp as *mut usize, addr);
         }
     }
+
+    /// Sets the TLS (thread-local storage) register, if containing such a register.
+    #[must_use]
+    pub const fn try_set_tls(&mut self, _tls: usize) -> bool {
+        false
+    }
 }
 
 /// Context to enter user space.

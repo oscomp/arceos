@@ -170,6 +170,13 @@ impl TrapFrame {
     pub const fn set_ra(&mut self, ra: usize) {
         self.regs.ra = ra;
     }
+
+    /// Sets the TLS (thread-local storage) register, if containing such a register.
+    #[must_use]
+    pub const fn try_set_tls(&mut self, tls: usize) -> bool {
+        self.regs.tp = tls;
+        true
+    }
 }
 
 /// Context to enter user space.
