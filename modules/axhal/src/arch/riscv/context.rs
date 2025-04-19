@@ -181,7 +181,7 @@ impl TrapFrame {
 
 /// Context to enter user space.
 #[cfg(feature = "uspace")]
-pub struct UspaceContext(pub TrapFrame);
+pub struct UspaceContext(TrapFrame);
 
 #[cfg(feature = "uspace")]
 impl UspaceContext {
