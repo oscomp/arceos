@@ -15,6 +15,7 @@ pub struct RawMutex {
 }
 
 impl RawMutex {
+    /// Creates a new [`RawMutex`].
     #[inline(always)]
     pub const fn new() -> Self {
         Self {
@@ -80,7 +81,9 @@ unsafe impl lock_api::RawMutex for RawMutex {
     }
 }
 
+/// A mutex.
 pub type Mutex<T> = lock_api::Mutex<RawMutex, T>;
+/// A mutex guard.
 pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, RawMutex, T>;
 
 #[cfg(test)]
