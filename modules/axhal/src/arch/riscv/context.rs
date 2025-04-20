@@ -170,6 +170,16 @@ impl TrapFrame {
     pub const fn set_ra(&mut self, ra: usize) {
         self.regs.ra = ra;
     }
+
+    /// Gets the TLS area.
+    pub fn tls(&self) -> usize {
+        self.regs.tp
+    }
+
+    /// Sets the TLS area.
+    pub fn set_tls(&mut self, tls_area: usize) {
+        self.regs.tp = tls_area;
+    }
 }
 
 /// Context to enter user space.
@@ -341,16 +351,6 @@ impl TaskContext {
     pub fn init(&mut self, entry: usize, kstack_top: VirtAddr, tls_area: VirtAddr) {
         self.sp = kstack_top.as_usize();
         self.ra = entry;
-        self.tp = tls_area.as_usize();
-    }
-
-    /// Gets the TLS area.
-    pub fn tls(&self) -> VirtAddr {
-        VirtAddr::from(self.tp)
-    }
-
-    /// Sets the TLS area.
-    pub fn set_tls(&mut self, tls_area: VirtAddr) {
         self.tp = tls_area.as_usize();
     }
 

@@ -27,8 +27,16 @@ syscall_entry:
     push    rcx
     push    rax
 
+    sub     rsp, 16
+    mov     rdi, rsp
+    call    switch_to_kernel_fs_base
+
     mov     rdi, rsp
     call    x86_syscall_handler
+
+    mov     rdi, rsp
+    call    switch_to_user_fs_base
+    add     rsp, 16
 
     pop     rax
     pop     rcx

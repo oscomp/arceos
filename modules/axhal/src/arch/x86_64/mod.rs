@@ -1,6 +1,7 @@
 mod context;
 mod gdt;
 mod idt;
+mod tls;
 
 #[cfg(feature = "uspace")]
 mod syscall;
