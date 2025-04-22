@@ -41,7 +41,11 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
         #[cfg(feature = "uspace")]
-        LEGACY_SYSCALL_VECTOR => super::syscall::x86_syscall_handler(tf),
+        LEGACY_SYSCALL_VECTOR => {
+            super::syscall::x86_syscall_handler(tf);
+            // x86_syscall_handler calls post_trap_callback internally
+            return;
+        }
         IRQ_VECTOR_START..=IRQ_VECTOR_END => {
             handle_trap!(IRQ, tf.vector as _);
         }
