@@ -6,29 +6,32 @@
 extern crate log;
 extern crate alloc;
 
-mod aspace;
-mod backend;
-
-pub use self::aspace::AddrSpace;
-pub use self::backend::Backend;
-
-use axerrno::{AxError, AxResult};
+use axerrno::AxResult;
 use axhal::mem::phys_to_virt;
+use axhal::paging::PagingHandlerImpl;
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::{PhysAddr, va};
-use memory_set::MappingError;
 
-static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
-
-fn mapping_err_to_ax_err(err: MappingError) -> AxError {
-    warn!("Mapping error: {:?}", err);
-    match err {
-        MappingError::InvalidParam => AxError::InvalidInput,
-        MappingError::AlreadyExists => AxError::AlreadyExists,
-        MappingError::BadState => AxError::BadState,
+cfg_if::cfg_if! {
+    if #[cfg(target_arch = "x86_64")] {
+        pub type ArchPagingMetatData = page_table_multiarch::x86_64::X64PagingMetaData;
+        pub type ArchPTE = page_table_entry::x86_64::X64PTE;
+    } else if #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))] {
+        pub type ArchPagingMetatData = page_table_multiarch::riscv::Sv39MetaData<memory_addr::VirtAddr>;
+        pub type ArchPTE = page_table_entry::riscv::Rv64PTE;
+    } else if #[cfg(target_arch = "aarch64")]{
+        pub type ArchPagingMetatData = page_table_multiarch::aarch64::A64PagingMetaData;
+        pub type ArchPTE = page_table_entry::aarch64::A64PTE;
+    } else if #[cfg(target_arch = "loongarch64")] {
+        pub type ArchPagingMetatData = page_table_multiarch::loongarch64::LA64MetaData;
+        pub type ArchPTE = page_table_entry::loongarch64::LA64PTE;
     }
 }
+
+pub type AddrSpace = aspace_generic::AddrSpace<ArchPagingMetatData, ArchPTE, PagingHandlerImpl>;
+
+static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
 
 /// Creates a new address space for kernel itself.
 pub fn new_kernel_aspace() -> AxResult<AddrSpace> {
