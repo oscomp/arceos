@@ -1,3 +1,5 @@
+use core::ptr;
+
 use alloc::collections::VecDeque;
 use alloc::sync::Arc;
 
@@ -206,8 +208,27 @@ impl WaitQueue {
     ///
     /// Returns the number of tasks requeued.
     pub fn requeue(&self, count: usize, target: &WaitQueue) -> usize {
-        let mut wq = self.queue.lock();
-        let mut target_wq = target.queue.lock();
+        let self_ptr = self as *const _ as usize;
+        let target_ptr = target as *const _ as usize;
+        if self_ptr == target_ptr {
+            // requeue within the same wait queue
+            let mut wq = self.queue.lock();
+            for _ in 0..count {
+                let Some(task) = wq.pop_front() else {
+                    break;
+                };
+                wq.push_back(task);
+            }
+            return count;
+        }
+
+        // avoid deadlock
+        let (mut wq, mut target_wq) = if self_ptr < target_ptr {
+            (self.queue.lock(), target.queue.lock())
+        } else {
+            let target_wq = target.queue.lock();
+            (self.queue.lock(), target_wq)
+        };
         let count = count.min(wq.len());
         for task in wq.drain(..count) {
             target_wq.push_back(task);
