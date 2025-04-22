@@ -291,7 +291,7 @@ impl core::ops::DerefMut for UspaceContext {
 ///
 /// - Callee-saved registers
 /// - Stack pointer register
-/// - Thread pointer register (for thread-local storage, currently unsupported)
+/// - Thread pointer register (for kernel-space thread-local storage)
 /// - FP/SIMD registers
 ///
 /// On context switch, current task saves its context from CPU to memory,
@@ -317,6 +317,7 @@ pub struct TaskContext {
     pub s10: usize,
     pub s11: usize,
 
+    /// Thread pointer
     pub tp: usize,
     /// The `satp` register value, i.e., the page table root.
     #[cfg(feature = "uspace")]

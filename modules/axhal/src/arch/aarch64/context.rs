@@ -259,7 +259,7 @@ impl FpState {
 ///
 /// - Callee-saved registers
 /// - Stack pointer register
-/// - Thread pointer register (for thread-local storage, currently unsupported)
+/// - Thread pointer register (for kernel space thread-local storage)
 /// - FP/SIMD registers
 ///
 /// On context switch, current task saves its context from CPU to memory,
@@ -281,6 +281,7 @@ pub struct TaskContext {
     pub r28: u64,
     pub r29: u64,
     pub lr: u64, // r30
+    /// Thread pointer
     pub tpidr_el0: u64,
     /// The `ttbr0_el1` register value, i.e., the page table root.
     #[cfg(feature = "uspace")]

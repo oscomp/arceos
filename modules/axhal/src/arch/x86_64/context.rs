@@ -330,7 +330,7 @@ impl fmt::Debug for ExtendedState {
 ///
 /// - Callee-saved registers
 /// - Stack pointer register
-/// - Thread pointer register (for thread-local storage, currently unsupported)
+/// - Thread pointer register (for kernel space thread-local storage)
 /// - FP/SIMD registers
 ///
 /// On context switch, current task saves its context from CPU to memory,
@@ -349,9 +349,11 @@ pub struct TaskContext {
     pub kstack_top: VirtAddr,
     /// `RSP` after all callee-saved registers are pushed.
     pub rsp: u64,
-    /// Thread Local Storage (TLS).
+    /// Thread pointer (FS segment base address)
     pub fs_base: usize,
-    /// The `gs_base` register value.
+    /// User space Thread pointer (GS segment base address)
+    ///
+    /// During task switching, it is written to `KernelGSBase` MSR.
     #[cfg(feature = "uspace")]
     pub gs_base: usize,
     /// Extended states, i.e., FP/SIMD states.
