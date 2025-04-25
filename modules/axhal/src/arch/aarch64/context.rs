@@ -114,12 +114,12 @@ impl TrapFrame {
     }
 
     /// Gets the TLS area.
-    pub fn tls(&self) -> usize {
+    pub const fn tls(&self) -> usize {
         self.tpidr as _
     }
 
     /// Sets the TLS area.
-    pub fn set_tls(&mut self, tls: usize) {
+    pub const fn set_tls(&mut self, tls: usize) {
         self.tpidr = tls as _;
     }
 }
