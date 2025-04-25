@@ -31,6 +31,7 @@ fn handle_page_fault(tf: &TrapFrame) {
 
 #[unsafe(no_mangle)]
 fn x86_trap_handler(tf: &mut TrapFrame) {
+    #[cfg(feature = "uspace")]
     super::tls::switch_to_kernel_fs_base(tf);
     match tf.vector as u8 {
         PAGE_FAULT_VECTOR => handle_page_fault(tf),
@@ -57,6 +58,7 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
     }
+    #[cfg(feature = "uspace")]
     super::tls::switch_to_user_fs_base(tf);
 }
 
