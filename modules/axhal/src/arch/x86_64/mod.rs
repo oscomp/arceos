@@ -1,10 +1,12 @@
 mod context;
 mod gdt;
 mod idt;
-mod tls;
 
 #[cfg(feature = "uspace")]
 mod syscall;
+
+#[cfg(feature = "uspace")]
+mod tls;
 
 #[cfg(target_os = "none")]
 mod trap;
