@@ -10,7 +10,7 @@ syscall_entry:
     push    r11                                     // rflags
     push    {ucode64}                               // cs
     push    rcx                                     // rip
-    sub     rsp, 2 * 8                              // skip until general registers
+    sub     rsp, 4 * 8                              // skip until general registers
 
     push    r15
     push    r14
@@ -27,12 +27,10 @@ syscall_entry:
     push    rdx
     push    rcx
     push    rax
-    sub     rsp, 16
 
     mov     rdi, rsp
     call    x86_syscall_handler
 
-    add     rsp, 16
     pop     rax
     pop     rcx
     pop     rdx
@@ -49,7 +47,7 @@ syscall_entry:
     pop     r14
     pop     r15
 
-    add     rsp, 7 * 8
+    add     rsp, 9 * 8
     mov     rcx, [rsp - 5 * 8]  // rip
     mov     r11, [rsp - 3 * 8]  // rflags
     mov     rsp, [rsp - 2 * 8]  // user rsp

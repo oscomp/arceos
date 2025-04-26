@@ -5,9 +5,6 @@ use memory_addr::VirtAddr;
 #[repr(C)]
 #[derive(Debug, Default, Clone, Copy)]
 pub struct TrapFrame {
-    pub fs_base: u64,
-    pub __pad: u64,
-
     pub rax: u64,
     pub rcx: u64,
     pub rdx: u64,
@@ -23,6 +20,10 @@ pub struct TrapFrame {
     pub r13: u64,
     pub r14: u64,
     pub r15: u64,
+
+    // Set by `tls.rs`
+    pub fs_base: u64,
+    pub __pad: u64,
 
     // Pushed by `trap.S`
     pub vector: u64,
@@ -212,7 +213,6 @@ impl UspaceContext {
         unsafe {
             core::arch::asm!("
                 mov     rsp, {tf}
-                add     rsp, 16
                 pop     rax
                 pop     rcx
                 pop     rdx
@@ -228,7 +228,7 @@ impl UspaceContext {
                 pop     r13
                 pop     r14
                 pop     r15
-                add     rsp, 16     // skip vector, error_code
+                add     rsp, 32     // skip fs_base, vector, error_code
                 swapgs
                 iretq",
                 tf = in(reg) &self.0,

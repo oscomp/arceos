@@ -32,6 +32,7 @@ _trap_handlers:
     jz      1f
     swapgs
 1:
+    sub     rsp, 16
     push    r15
     push    r14
     push    r13
@@ -47,12 +48,10 @@ _trap_handlers:
     push    rdx
     push    rcx
     push    rax
-    sub     rsp, 16
 
     mov     rdi, rsp
     call    x86_trap_handler
 
-    add     rsp, 16
     pop     rax
     pop     rcx
     pop     rdx
@@ -69,6 +68,7 @@ _trap_handlers:
     pop     r14
     pop     r15
 
+    add     rsp, 16
     test    byte ptr [rsp + 3 * 8], 3   # swap GS back if return to user space
     jz      2f
     swapgs
