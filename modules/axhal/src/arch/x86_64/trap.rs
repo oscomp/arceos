@@ -43,11 +43,7 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
         #[cfg(feature = "uspace")]
-        LEGACY_SYSCALL_VECTOR => {
-            super::syscall::handle_syscall(tf);
-            // x86_syscall_handler calls post_trap_callback internally
-            return;
-        }
+        LEGACY_SYSCALL_VECTOR => super::syscall::handle_syscall(tf),
         IRQ_VECTOR_START..=IRQ_VECTOR_END => {
             handle_trap!(IRQ, tf.vector as _);
         }
@@ -62,9 +58,9 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
     }
+    crate::trap::post_trap_callback(tf, tf.is_user());
     #[cfg(feature = "uspace")]
     super::tls::switch_to_user_fs_base(tf);
-    crate::trap::post_trap_callback(tf, tf.is_user());
 }
 
 fn vec_to_str(vec: u64) -> &'static str {
