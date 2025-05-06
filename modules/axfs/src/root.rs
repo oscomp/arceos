@@ -191,12 +191,13 @@ pub(crate) fn init_rootfs(disk: crate::dev::Disk) {
 }
 
 def_resource! {
-    /// The current working directory path
-    pub static CURRENT_DIR_PATH: Mutex<String> = Mutex::new("/".into());
-    /// The current working directory node
-    // Note: we can write this since resources are lazily initialized,
-    // but this requires that no resource can be accessed before `init_rootfs` finished.
-    pub static CURRENT_DIR: Mutex<VfsNodeRef> = Mutex::new(ROOT_DIR.clone());
+    /// The current working directory node and path
+    pub static CURRENT_DIR: Mutex<(VfsNodeRef, String)> = Mutex::new((
+        // Note: we can write this since resources are lazily initialized,
+        // but this requires that no resource can be accessed before `init_rootfs` finished.
+        ROOT_DIR.clone(),
+        "/".into(),
+    ));
 }
 
 fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {
@@ -204,7 +205,7 @@ fn parent_node_of(dir: Option<&VfsNodeRef>, path: &str) -> VfsNodeRef {
         ROOT_DIR.clone()
     } else {
         dir.cloned()
-            .unwrap_or_else(|| CURRENT_DIR.current().lock().clone())
+            .unwrap_or_else(|| CURRENT_DIR.current().lock().0.clone())
     }
 }
 
@@ -212,7 +213,7 @@ pub(crate) fn absolute_path(path: &str) -> AxResult<String> {
     if path.starts_with('/') {
         Ok(axfs_vfs::path::canonicalize(path))
     } else {
-        let path = CURRENT_DIR_PATH.current().lock().clone() + path;
+        let path = CURRENT_DIR.current().lock().1.clone() + path;
         Ok(axfs_vfs::path::canonicalize(&path))
     }
 }
@@ -290,7 +291,7 @@ pub(crate) fn remove_dir(dir: Option<&VfsNodeRef>, path: &str) -> AxResult {
 }
 
 pub(crate) fn current_dir() -> AxResult<String> {
-    Ok(CURRENT_DIR_PATH.current().lock().clone())
+    Ok(CURRENT_DIR.current().lock().1.clone())
 }
 
 pub(crate) fn set_current_dir(path: &str) -> AxResult {
@@ -299,8 +300,7 @@ pub(crate) fn set_current_dir(path: &str) -> AxResult {
         abs_path += "/";
     }
     if abs_path == "/" {
-        *CURRENT_DIR.current().lock() = ROOT_DIR.clone();
-        *CURRENT_DIR_PATH.current().lock() = "/".into();
+        *CURRENT_DIR.current().lock() = (ROOT_DIR.clone(), "/".into());
         return Ok(());
     }
 
@@ -311,8 +311,7 @@ pub(crate) fn set_current_dir(path: &str) -> AxResult {
     } else if !attr.perm().owner_executable() {
         ax_err!(PermissionDenied)
     } else {
-        *CURRENT_DIR.current().lock() = node;
-        *CURRENT_DIR_PATH.current().lock() = abs_path;
+        *CURRENT_DIR.current().lock() = (node, abs_path);
         Ok(())
     }
 }
