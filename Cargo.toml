@@ -12,7 +12,6 @@ members = [
     "modules/axmm",
     "modules/axdma",
     "modules/axnet",
-    "modules/axns",
     "modules/axruntime",
     "modules/axsync",
     "modules/axtask",
@@ -59,11 +58,12 @@ axhal = { path = "modules/axhal" }
 axlog = { path = "modules/axlog" }
 axmm = { path = "modules/axmm" }
 axnet = { path = "modules/axnet" }
-axns = { path = "modules/axns" }
 axruntime = { path = "modules/axruntime" }
 axsync = { path = "modules/axsync" }
 axtask = { path = "modules/axtask" }
 axdma = { path = "modules/axdma" }
+
+axns = { git = "https://github.com/Starry-OS/axns.git", rev = "622a680" }
 
 [profile.release]
 lto = true
