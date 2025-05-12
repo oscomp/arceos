@@ -150,3 +150,22 @@ pub fn cpu_init() {
     set_exception_vector_base(exception_vector_base as usize);
     unsafe { write_page_table_root0(0.into()) }; // disable low address access in EL1
 }
+
+
+/// Interrupt unmasking function for exception handling.
+/// NOTE: It must be invoked after the switch to kernel mode has finished
+///
+/// If interrupts were enabled before the exception (`I` bit in `SPSR` is unmask),
+/// re-enable interrupts before handling the exception.
+///
+/// On aarch64, when an exception occurs, the `CPSR` register value is stored in
+/// `SPSR_EL1`, where the `I` bit records whether the interrupt is enabled or not.
+/// `I::unmask` enable_irqs
+pub fn unmask_interrupts_for_exception(tf: &TrapFrame) {
+    const I_MASK: u64 = 1 << 7;
+    if tf.spsr & I_MASK != I_MASK {
+        enable_irqs();
+    } else {
+        debug!("Interrupts were disabled before exception");
+    }
+}

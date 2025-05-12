@@ -210,3 +210,23 @@ pub fn cpu_init() {
     }
     set_exception_entry_base(exception_entry_base as usize);
 }
+
+/// Interrupt unmasking function for exception handling.
+/// NOTE: It must be invoked after the switch to kernel mode has finished
+///
+/// If interrupts were enabled before the exception (`PIE` bit in `PRMD` is set),
+/// re-enable interrupts before handling the exception.
+///
+/// On loongarch64, when an exception is triggered, records the old value of
+/// `IE` domain in `CSR.CRMD` in `PIE` domain in `PRMD`. When the `ERTN`
+/// instruction is executed to return from the exception handler, the hardware
+/// restores the value of the `PIE` domain to the `IE` domain of `CSR.CRMD`.
+pub fn unmask_interrupts_for_exception(tf: &TrapFrame) {
+    const PIE: usize = 1 << 2;
+    if tf.prmd & PIE == PIE {
+        enable_irqs();
+    } else {
+        debug!("Interrupts were disabled before exception");
+    }
+
+}

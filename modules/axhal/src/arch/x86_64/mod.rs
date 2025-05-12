@@ -136,3 +136,18 @@ pub fn cpu_init() {
     #[cfg(feature = "uspace")]
     init_syscall();
 }
+
+/// Interrupt unmasking function for exception handling.
+/// NOTE: It must be invoked after the switch to kernel mode has finished
+///
+/// If interrupts were enabled before the exception (`IF` bit in `RFlags`
+/// is set), re-enable interrupts before handling the exception.
+pub fn unmask_interrupts_for_exception(tf: &TrapFrame) {
+    use x86_64::registers::rflags::RFlags;
+    const IF: u64 = RFlags::INTERRUPT_FLAG.bits();
+    if tf.rflags & IF == IF {
+        enable_irqs();
+    } else {
+        debug!("Interrupts were disabled before exception");
+    }
+}
