@@ -151,7 +151,6 @@ pub fn cpu_init() {
     unsafe { write_page_table_root0(0.into()) }; // disable low address access in EL1
 }
 
-
 /// Interrupt unmasking function for exception handling.
 /// NOTE: It must be invoked after the switch to kernel mode has finished
 ///

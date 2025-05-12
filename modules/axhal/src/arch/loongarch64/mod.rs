@@ -228,5 +228,4 @@ pub fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     } else {
         debug!("Interrupts were disabled before exception");
     }
-
 }
