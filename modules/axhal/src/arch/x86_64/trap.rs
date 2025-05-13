@@ -12,9 +12,6 @@ const LEGACY_SYSCALL_VECTOR: u8 = 0x80;
 const IRQ_VECTOR_START: u8 = 0x20;
 const IRQ_VECTOR_END: u8 = 0xff;
 
-const EXCEPTION_VECTOR_START: u8 = 0x0;
-const EXCEPTION_VECTOR_END: u8 = 0x1f;
-
 fn handle_page_fault(tf: &TrapFrame) {
     let access_flags = err_code_to_flags(tf.error_code)
         .unwrap_or_else(|e| panic!("Invalid #PF error code: {:#x}", e));
@@ -36,7 +33,7 @@ fn handle_page_fault(tf: &TrapFrame) {
 fn x86_trap_handler(tf: &mut TrapFrame) {
     #[cfg(feature = "uspace")]
     super::tls::switch_to_kernel_fs_base(tf);
-    if is_exception(tf.vector) {
+    if !matches!(tf.vector as u8, IRQ_VECTOR_START..=IRQ_VECTOR_END) {
         unmask_interrupts_for_exception(tf);
     }
     match tf.vector as u8 {
@@ -102,19 +99,12 @@ fn err_code_to_flags(err_code: u64) -> Result<MappingFlags, u64> {
     }
 }
 
-fn is_exception(vec: u64) -> bool {
-    match vec as u8 {
-        LEGACY_SYSCALL_VECTOR | EXCEPTION_VECTOR_START..=EXCEPTION_VECTOR_END => true,
-        _ => false,
-    }
-}
-
 // Interrupt unmasking function for exception handling.
 // NOTE: It must be invoked after the switch to kernel mode has finished
 //
 // If interrupts were enabled before the exception (`IF` bit in `RFlags`
 // is set), re-enable interrupts before handling the exception.
-pub(crate) fn unmask_interrupts_for_exception(tf: &TrapFrame) {
+pub(super) fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     use x86_64::registers::rflags::RFlags;
     const IF: u64 = RFlags::INTERRUPT_FLAG.bits();
     if tf.rflags & IF == IF {

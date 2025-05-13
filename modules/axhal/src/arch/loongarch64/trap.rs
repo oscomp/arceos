@@ -38,7 +38,7 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     let estat = estat::read();
     let trap = estat.cause();
 
-    if is_exception(&trap) {
+    if matches!(trap, Trap::Exception(_)) {
         unmask_interrupts_for_exception(tf);
     }
 
@@ -76,13 +76,6 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     }
 
     crate::trap::post_trap_callback(tf, from_user);
-}
-
-fn is_exception(trap: &Trap) -> bool {
-    match trap {
-        Trap::Exception(_) => true,
-        _ => false,
-    }
 }
 
 // Interrupt unmasking function for exception handling.
