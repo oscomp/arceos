@@ -114,7 +114,7 @@ fn is_exception(vec: u64) -> bool {
 //
 // If interrupts were enabled before the exception (`IF` bit in `RFlags`
 // is set), re-enable interrupts before handling the exception.
-fn unmask_interrupts_for_exception(tf: &TrapFrame) {
+pub(crate) fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     use x86_64::registers::rflags::RFlags;
     const IF: u64 = RFlags::INTERRUPT_FLAG.bits();
     if tf.rflags & IF == IF {
