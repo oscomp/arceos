@@ -37,6 +37,9 @@ fn handle_page_fault(tf: &TrapFrame, mut access_flags: MappingFlags, is_user: bo
 fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     let scause = scause::read();
     if let Ok(cause) = scause.cause().try_into::<I, E>() {
+        if scause.is_exception() {
+            unmask_interrupts_for_exception(tf);
+        }
         match cause {
             #[cfg(feature = "uspace")]
             Trap::Exception(E::UserEnvCall) => {
@@ -68,5 +71,24 @@ fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             tf.sepc,
             tf
         );
+    }
+}
+
+
+/// Interrupt unmasking function for exception handling.
+/// NOTE: It must be invoked after the switch to kernel mode has finished
+///
+/// If interrupts were enabled before the exception (the `SPIE` bit in the
+/// `sstatus` register is set), re-enable interrupts before exception handling
+///
+/// On riscv64, when an exception occurs, `sstatus.SIE` is set to zero to mask
+/// the interrupt and the old value of `SIE` is stored in SPIE. Recover `SIE`
+/// according to `SPIE` when using `sret`.
+fn unmask_interrupts_for_exception(tf: &TrapFrame) {
+    const PIE: usize = 1 << 5;
+    if tf.sstatus & PIE == PIE {
+        super::enable_irqs();
+    } else {
+        debug!("Interrupts were disabled before exception");
     }
 }

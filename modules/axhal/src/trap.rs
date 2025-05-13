@@ -51,8 +51,5 @@ pub(crate) fn post_trap_callback(tf: &mut TrapFrame, from_user: bool) {
 /// Call the external syscall handler.
 #[cfg(feature = "uspace")]
 pub(crate) fn handle_syscall(tf: &mut TrapFrame, syscall_num: usize) -> isize {
-    // The interrupt is set according to the interrupt state before the
-    // exception occurs.
-    crate::arch::unmask_interrupts_for_exception(tf);
     SYSCALL[0](tf, syscall_num)
 }
