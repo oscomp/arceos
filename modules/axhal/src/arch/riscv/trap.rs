@@ -74,16 +74,15 @@ fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     }
 }
 
-
-/// Interrupt unmasking function for exception handling.
-/// NOTE: It must be invoked after the switch to kernel mode has finished
-///
-/// If interrupts were enabled before the exception (the `SPIE` bit in the
-/// `sstatus` register is set), re-enable interrupts before exception handling
-///
-/// On riscv64, when an exception occurs, `sstatus.SIE` is set to zero to mask
-/// the interrupt and the old value of `SIE` is stored in SPIE. Recover `SIE`
-/// according to `SPIE` when using `sret`.
+// Interrupt unmasking function for exception handling.
+// NOTE: It must be invoked after the switch to kernel mode has finished
+//
+// If interrupts were enabled before the exception (the `SPIE` bit in the
+// `sstatus` register is set), re-enable interrupts before exception handling
+//
+// On riscv64, when an exception occurs, `sstatus.SIE` is set to zero to mask
+// the interrupt and the old value of `SIE` is stored in SPIE. Recover `SIE`
+// according to `SPIE` when using `sret`.
 fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     const PIE: usize = 1 << 5;
     if tf.sstatus & PIE == PIE {
