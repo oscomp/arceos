@@ -1,3 +1,4 @@
+use memory_addr::VirtAddr;
 use page_table_entry::MappingFlags;
 use riscv::interrupt::Trap;
 use riscv::interrupt::supervisor::{Exception as E, Interrupt as I};
@@ -16,11 +17,15 @@ fn handle_breakpoint(sepc: &mut usize) {
     *sepc += 2
 }
 
-fn handle_page_fault(tf: &TrapFrame, mut access_flags: MappingFlags, is_user: bool) {
+fn handle_page_fault(
+    tf: &TrapFrame,
+    vaddr: VirtAddr,
+    mut access_flags: MappingFlags,
+    is_user: bool,
+) {
     if is_user {
         access_flags |= MappingFlags::USER;
     }
-    let vaddr = va!(stval::read());
     if !handle_trap!(PAGE_FAULT, vaddr, access_flags, is_user) {
         panic!(
             "Unhandled {} Page Fault @ {:#x}, fault_vaddr={:#x} ({:?}):\n{:#x?}",
@@ -37,6 +42,9 @@ fn handle_page_fault(tf: &TrapFrame, mut access_flags: MappingFlags, is_user: bo
 fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
     let scause = scause::read();
     if let Ok(cause) = scause.cause().try_into::<I, E>() {
+        // Interrupts modify the value of `stval`, which must be saved before the
+        // interrupt is enabled
+        let vaddr = va!(stval::read());
         if scause.is_exception() {
             unmask_interrupts_for_exception(tf);
         }
@@ -47,13 +55,13 @@ fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
                 tf.regs.a0 = crate::trap::handle_syscall(tf, tf.regs.a7) as usize;
             }
             Trap::Exception(E::LoadPageFault) => {
-                handle_page_fault(tf, MappingFlags::READ, from_user)
+                handle_page_fault(tf, vaddr, MappingFlags::READ, from_user)
             }
             Trap::Exception(E::StorePageFault) => {
-                handle_page_fault(tf, MappingFlags::WRITE, from_user)
+                handle_page_fault(tf, vaddr, MappingFlags::WRITE, from_user)
             }
             Trap::Exception(E::InstructionPageFault) => {
-                handle_page_fault(tf, MappingFlags::EXECUTE, from_user)
+                handle_page_fault(tf, vaddr, MappingFlags::EXECUTE, from_user)
             }
             Trap::Exception(E::Breakpoint) => handle_breakpoint(&mut tf.sepc),
             Trap::Interrupt(_) => {
