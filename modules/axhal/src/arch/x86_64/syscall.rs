@@ -25,6 +25,8 @@ fn x86_syscall_handler(tf: &mut TrapFrame) {
     #[cfg(target_os = "none")]
     super::trap::unmask_interrupts_for_exception(tf);
     handle_syscall(tf);
+    #[cfg(target_os = "none")]
+    super::trap::mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, true);
     super::tls::switch_to_user_fs_base(tf);
 }

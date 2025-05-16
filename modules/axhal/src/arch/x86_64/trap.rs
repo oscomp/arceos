@@ -61,6 +61,7 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
     }
+    mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, tf.is_user());
     #[cfg(feature = "uspace")]
     super::tls::switch_to_user_fs_base(tf);
@@ -112,4 +113,8 @@ pub(super) fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     } else {
         debug!("Interrupts were disabled before exception");
     }
+}
+
+pub(super) fn mask_interrupts_after_exception() {
+    super::disable_irqs();
 }

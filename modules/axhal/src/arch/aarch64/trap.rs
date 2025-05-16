@@ -133,6 +133,7 @@ fn handle_sync_exception(tf: &mut TrapFrame, source: TrapSource) {
             );
         }
     }
+    mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, source.is_from_user());
 }
 
@@ -152,4 +153,8 @@ fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     } else {
         debug!("Interrupts were disabled before exception");
     }
+}
+
+fn mask_interrupts_after_exception() {
+    super::disable_irqs();
 }

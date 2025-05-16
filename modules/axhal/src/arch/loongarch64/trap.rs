@@ -74,7 +74,7 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             );
         }
     }
-
+    mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, from_user);
 }
 
@@ -95,4 +95,8 @@ fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     } else {
         debug!("Interrupts were disabled before exception");
     }
+}
+
+fn mask_interrupts_after_exception() {
+    super::disable_irqs();
 }

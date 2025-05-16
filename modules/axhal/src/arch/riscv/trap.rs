@@ -71,6 +71,7 @@ fn riscv_trap_handler(tf: &mut TrapFrame, from_user: bool) {
                 panic!("Unhandled trap {:?} @ {:#x}:\n{:#x?}", cause, tf.sepc, tf);
             }
         }
+        mask_interrupts_after_exception();
         crate::trap::post_trap_callback(tf, from_user);
     } else {
         panic!(
@@ -98,4 +99,8 @@ fn unmask_interrupts_for_exception(tf: &TrapFrame) {
     } else {
         debug!("Interrupts were disabled before exception");
     }
+}
+
+fn mask_interrupts_after_exception() {
+    super::disable_irqs();
 }
