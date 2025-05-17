@@ -61,10 +61,10 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
             );
         }
     }
-    mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, tf.is_user());
     #[cfg(feature = "uspace")]
     super::tls::switch_to_user_fs_base(tf);
+    mask_interrupts_after_exception();
 }
 
 fn vec_to_str(vec: u64) -> &'static str {

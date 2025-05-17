@@ -74,8 +74,8 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             );
         }
     }
-    mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, from_user);
+    mask_interrupts_after_exception();
 }
 
 // Interrupt unmasking function for exception handling.

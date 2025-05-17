@@ -133,8 +133,8 @@ fn handle_sync_exception(tf: &mut TrapFrame, source: TrapSource) {
             );
         }
     }
-    mask_interrupts_after_exception();
     crate::trap::post_trap_callback(tf, source.is_from_user());
+    mask_interrupts_after_exception();
 }
 
 // Interrupt unmasking function for exception handling.
