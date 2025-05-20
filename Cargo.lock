@@ -177,7 +177,6 @@ dependencies = [
  "axsync",
  "axtask",
  "bindgen",
- "ctor_bare",
  "flatten_objects",
  "lazy_static",
  "spin",
@@ -558,10 +557,10 @@ dependencies = [
 [[package]]
 name = "axns"
 version = "0.1.0"
+source = "git+https://github.com/Starry-OS/axns.git?rev=622a680#622a680ebe3d3ba985e3ae4ca51da06a2c21bda3"
 dependencies = [
- "axns",
- "crate_interface",
- "lazyinit",
+ "extern-trait",
+ "spin",
 ]
 
 [[package]]
@@ -960,6 +959,17 @@ checksum = "33d852cb9b869c2a9b3df2f71a3074817f01e1844f839a144f5fcef059a4eb5d"
 dependencies = [
  "libc",
  "windows-sys",
+]
+
+[[package]]
+name = "extern-trait"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce0ed68d501561822bd225ab2ec7e67ea2c141258b382a9541c2257eec2e5d10"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
 ]
 
 [[package]]
