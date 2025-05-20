@@ -301,6 +301,13 @@ impl VfsNodeOps for FileWrapper {
         r.map_err(|e| e.try_into().unwrap())
     }
 
+    fn fsync(&self) -> VfsResult {
+        let mut file = self.0.lock();
+        file.file_cache_flush()
+            .map(|_v| ())
+            .map_err(|e| e.try_into().unwrap())
+    }
+
     fn truncate(&self, size: u64) -> VfsResult {
         let mut file = self.0.lock();
         let path = file.get_path();

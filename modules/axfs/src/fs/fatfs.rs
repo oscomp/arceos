@@ -96,6 +96,10 @@ impl<IO: IoTrait> VfsNodeOps for FileWrapper<'static, IO> {
         file.seek(SeekFrom::Start(size)).map_err(as_vfs_err)?; // TODO: more efficient
         file.truncate().map_err(as_vfs_err)
     }
+
+    fn fsync(&self) -> VfsResult {
+        self.0.lock().flush().map_err(as_vfs_err)
+    }
 }
 
 impl<IO: IoTrait> VfsNodeOps for DirWrapper<'static, IO> {
