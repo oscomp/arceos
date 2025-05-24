@@ -341,37 +341,35 @@ impl TaskContext {
     }
 }
 
-#[naked]
+#[unsafe(naked)]
 unsafe extern "C" fn context_switch(_current_task: &mut TaskContext, _next_task: &TaskContext) {
-    unsafe {
-        naked_asm!(
-            "
-            // save old context (callee-saved registers)
-            stp     x29, x30, [x0, 11 * 8]
-            stp     x27, x28, [x0, 9 * 8]
-            stp     x25, x26, [x0, 7 * 8]
-            stp     x23, x24, [x0, 5 * 8]
-            stp     x21, x22, [x0, 3 * 8]
-            stp     x19, x20, [x0, 1 * 8]
-            mov     x19, sp
-            str     x19, [x0]
+    naked_asm!(
+        "
+        // save old context (callee-saved registers)
+        stp     x29, x30, [x0, 11 * 8]
+        stp     x27, x28, [x0, 9 * 8]
+        stp     x25, x26, [x0, 7 * 8]
+        stp     x23, x24, [x0, 5 * 8]
+        stp     x21, x22, [x0, 3 * 8]
+        stp     x19, x20, [x0, 1 * 8]
+        mov     x19, sp
+        str     x19, [x0]
 
-            // restore new context
-            ldr     x19, [x1]
-            mov     sp, x19
-            ldp     x19, x20, [x1, 1 * 8]
-            ldp     x21, x22, [x1, 3 * 8]
-            ldp     x23, x24, [x1, 5 * 8]
-            ldp     x25, x26, [x1, 7 * 8]
-            ldp     x27, x28, [x1, 9 * 8]
-            ldp     x29, x30, [x1, 11 * 8]
+        // restore new context
+        ldr     x19, [x1]
+        mov     sp, x19
+        ldp     x19, x20, [x1, 1 * 8]
+        ldp     x21, x22, [x1, 3 * 8]
+        ldp     x23, x24, [x1, 5 * 8]
+        ldp     x25, x26, [x1, 7 * 8]
+        ldp     x27, x28, [x1, 9 * 8]
+        ldp     x29, x30, [x1, 11 * 8]
 
-            ret",
-        )
-    }
+        ret",
+    )
 }
 
-#[naked]
+#[unsafe(naked)]
 #[cfg(feature = "fp_simd")]
 unsafe extern "C" fn fpstate_switch(_current_fpstate: &mut FpState, _next_fpstate: &FpState) {
     naked_asm!(

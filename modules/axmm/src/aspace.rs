@@ -169,20 +169,20 @@ impl AddrSpace {
 
         while let Some(area) = self.areas.find(start) {
             let backend = area.backend();
-            if let Backend::Alloc { populate } = backend {
-                if !*populate {
-                    for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
-                        match self.pt.query(addr) {
-                            Ok(_) => {}
-                            // If the page is not mapped, try map it.
-                            Err(PagingError::NotMapped) => {
-                                if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
-                                    return Err(AxError::NoMemory);
-                                }
+            if let Backend::Alloc { populate } = backend
+                && !*populate
+            {
+                for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
+                    match self.pt.query(addr) {
+                        Ok(_) => {}
+                        // If the page is not mapped, try map it.
+                        Err(PagingError::NotMapped) => {
+                            if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
+                                return Err(AxError::NoMemory);
                             }
-                            Err(_) => return Err(AxError::BadAddress),
-                        };
-                    }
+                        }
+                        Err(_) => return Err(AxError::BadAddress),
+                    };
                 }
             }
             start = area.end();
