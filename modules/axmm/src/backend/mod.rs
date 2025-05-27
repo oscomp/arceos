@@ -6,6 +6,7 @@ use memory_set::MappingBackend;
 
 mod alloc;
 mod linear;
+mod file;
 
 /// A unified enum type for different memory mapping backends.
 ///
@@ -36,6 +37,13 @@ pub enum Backend {
         /// Whether to populate the physical frames when creating the mapping.
         populate: bool,
     },
+    /// File mapping backend.
+    File {
+        fd: i32,
+        offset: usize,
+        shared: bool,
+        populate: bool,
+    },
 }
 
 impl MappingBackend for Backend {
@@ -46,6 +54,7 @@ impl MappingBackend for Backend {
         match *self {
             Self::Linear { pa_va_offset } => Self::map_linear(start, size, flags, pt, pa_va_offset),
             Self::Alloc { populate } => Self::map_alloc(start, size, flags, pt, populate),
+            Self::File { .. } => true,
         }
     }
 
@@ -53,6 +62,7 @@ impl MappingBackend for Backend {
         match *self {
             Self::Linear { pa_va_offset } => Self::unmap_linear(start, size, pt, pa_va_offset),
             Self::Alloc { populate } => Self::unmap_alloc(start, size, pt, populate),
+            Self::File { .. } => true,
         }
     }
 
@@ -81,7 +91,8 @@ impl Backend {
             Self::Linear { .. } => false, // Linear mappings should not trigger page faults.
             Self::Alloc { populate } => {
                 Self::handle_page_fault_alloc(vaddr, orig_flags, page_table, populate)
-            }
+            },
+            Self::File { .. } => false,
         }
     }
 }

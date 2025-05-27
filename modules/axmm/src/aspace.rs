@@ -2,7 +2,7 @@ use core::fmt;
 
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
-use axhal::paging::{MappingFlags, PageTable, PagingError};
+use axhal::paging::{MappingFlags, PageTable, PagingError, PageSize};
 use memory_addr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
@@ -159,6 +159,58 @@ impl AddrSpace {
             .map(area, &mut self.pt, false)
             .map_err(mapping_err_to_ax_err)?;
         Ok(())
+    }
+
+    pub fn map_shm(
+        &mut self,
+        start: VirtAddr,
+        size: usize,
+        flags: MappingFlags,
+        populate: bool,
+    ) -> AxResult {
+        panic!("Unimplement");
+    }
+
+    /// Add a new file mapping
+    pub fn map_file(
+        &mut self,
+        start: VirtAddr,
+        size: usize,
+        flags: MappingFlags,
+        fd: i32,
+        offset: usize,
+        shared: bool,
+        populate: bool,
+    ) -> AxResult {
+        self.validate_region(start, size)?;
+        // warn!("map file flags: {}", flags.contains(MappingFlags::WRITE));
+        let area = MemoryArea::new(start, size, flags, Backend::new_file(fd, offset, shared, populate));
+        self.areas
+            .map(area, &mut self.pt, false)
+            .map_err(mapping_err_to_ax_err)?;
+        Ok(())
+    }
+
+    /// Forcely set the page table
+    pub fn force_map_page(
+        &mut self, 
+        vaddr: VirtAddr, 
+        paddr: PhysAddr, 
+        access_flags: MappingFlags
+    ) -> bool {
+        match self.areas.find(vaddr) {
+            Some(area) => {
+                if area.flags().contains(access_flags) {
+                    self.pt.map(vaddr, paddr, PageSize::Size4K, area.flags())
+                        .map(|_| true)
+                        .unwrap_or_else(|_| panic!("FORCE MAP PAGE FAILED(PAGE TABLE FAILEDA): {:#x} => {:#x}!", vaddr, paddr));
+                } else {
+                    panic!("FORCE MAP PAGE FAILED(ACCESS MOD): {:#x} => {:#x}!", vaddr, paddr);
+                }
+            },
+            _ => panic!("FORCE MAP PAGE FAILED(NO AREA): {:#x} => {:#x}!", vaddr, paddr),
+        };
+        true
     }
 
     /// Populates the area with physical frames, returning false if the area
@@ -360,10 +412,25 @@ impl AddrSpace {
         false
     }
 
+    /// Returns (fd, offset, shared, popoulate, virtaddr_start)
+    pub fn get_file_metadata(&mut self, vaddr: VirtAddr) -> Option<(i32, usize, bool, bool, VirtAddr)> {
+        if !self.va_range.contains(vaddr) {
+            return None;
+        }
+        if let Some(area) = self.areas.find(vaddr) {
+            match area.backend() {
+                Backend::File { fd, offset, shared, populate } 
+                    => return Some((*fd, *offset, *shared, *populate, area.start())),
+                _ => return None,
+            }
+        }
+        None
+    }
+
     /// Handles a page fault at the given address.
     ///
     /// `access_flags` indicates the access type that caused the page fault.
-    ///
+    /// 
     /// Returns `true` if the page fault is handled successfully (not a real
     /// fault).
     pub fn handle_page_fault(&mut self, vaddr: VirtAddr, access_flags: MappingFlags) -> bool {
