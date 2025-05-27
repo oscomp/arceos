@@ -1,22 +1,25 @@
-use axalloc::global_allocator;
-use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use memory_addr::{PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr};
+
+use crate::page::page_manager;
 
 use super::Backend;
 
 fn alloc_frame(zeroed: bool) -> Option<PhysAddr> {
-    let vaddr = VirtAddr::from(global_allocator().alloc_pages(1, PAGE_SIZE_4K).ok()?);
-    if zeroed {
-        unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, PAGE_SIZE_4K) };
-    }
-    let paddr = virt_to_phys(vaddr);
-    Some(paddr)
+    page_manager()
+        .lock()
+        .alloc(1, PAGE_SIZE_4K)
+        .ok()
+        .map(|page| {
+            if zeroed {
+                page.zero();
+            }
+            page.start_paddr()
+        })
 }
 
 fn dealloc_frame(frame: PhysAddr) {
-    let vaddr = phys_to_virt(frame);
-    global_allocator().dealloc_pages(vaddr.as_usize(), 1);
+    page_manager().lock().dealloc(frame);
 }
 
 impl Backend {
