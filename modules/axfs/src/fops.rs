@@ -24,6 +24,7 @@ pub type FilePerm = axfs_vfs::VfsNodePerm;
 pub struct File {
     node: WithCap<VfsNodeRef>,
     is_append: bool,
+    is_direct: bool,
     offset: u64,
 }
 
@@ -46,6 +47,7 @@ pub struct OpenOptions {
     create: bool,
     create_new: bool,
     directory: bool,
+    direct: bool,
     // system-specific
     _custom_flags: i32,
     _mode: u32,
@@ -64,6 +66,7 @@ impl OpenOptions {
             create: false,
             create_new: false,
             directory: false,
+            direct: false,
             // system-specific
             _custom_flags: 0,
             _mode: 0o666,
@@ -101,6 +104,11 @@ impl OpenOptions {
     pub fn directory(&mut self, directory: bool) {
         self.directory = directory;
     }
+    /// Sets the option to use page cache
+    pub fn direct(&mut self, direct: bool) {
+        self.direct = direct;
+    }
+    
     /// check whether contains directory.
     pub fn has_directory(&self) -> bool {
         self.directory
@@ -152,7 +160,6 @@ impl File {
     }
 
     fn _open_at(dir: Option<&VfsNodeRef>, path: &str, opts: &OpenOptions) -> AxResult<Self> {
-        debug!("open file: {} {:?}", path, opts);
         if !opts.is_valid() {
             return ax_err!(InvalidInput);
         }
@@ -192,6 +199,7 @@ impl File {
         Ok(Self {
             node: WithCap::new(node, access_cap),
             is_append: opts.append,
+            is_direct: opts.direct,
             offset: 0,
         })
     }
@@ -278,6 +286,16 @@ impl File {
     /// Gets the file attributes.
     pub fn get_attr(&self) -> AxResult<FileAttr> {
         self.access_node(Cap::empty())?.get_attr()
+    }
+
+    /// Gets the file offset
+    pub fn get_offset(&self) -> u64 {
+        self.offset
+    }
+
+    /// Check whether direct or not
+    pub fn is_direct(&self) -> bool {
+        self.is_direct
     }
 }
 
