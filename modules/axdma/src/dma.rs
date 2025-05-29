@@ -2,7 +2,10 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use allocator::{AllocError, AllocResult, BaseAllocator, ByteAllocator};
 use axalloc::{DefaultByteAllocator, global_allocator};
-use axhal::{mem::virt_to_phys, paging::MappingFlags};
+use axhal::{
+    mem::virt_to_phys,
+    paging::{MappingFlags, PageSize},
+};
 use kspin::SpinNoIrq;
 use log::{debug, error};
 use memory_addr::{PAGE_SIZE_4K, VirtAddr, va};
@@ -94,7 +97,7 @@ impl DmaAllocator {
         let expand_size = num_pages * PAGE_SIZE_4K;
         axmm::kernel_aspace()
             .lock()
-            .protect(vaddr, expand_size, flags)
+            .protect(vaddr, expand_size, flags, PageSize::Size4K)
             .map_err(|e| {
                 error!("change table flag fail: {e:?}");
                 AllocError::NoMemory
