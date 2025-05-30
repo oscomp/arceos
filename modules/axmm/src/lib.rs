@@ -19,6 +19,11 @@ use lazyinit::LazyInit;
 use memory_addr::{PhysAddr, va};
 use memory_set::MappingError;
 
+/// support huge page size 2m
+pub const PAGE_SIZE_2M: usize = 0x20_0000;
+/// support huge page size 1g
+pub const PAGE_SIZE_1G: usize = 0x4000_0000;
+
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
 
 fn mapping_err_to_ax_err(err: MappingError) -> AxError {

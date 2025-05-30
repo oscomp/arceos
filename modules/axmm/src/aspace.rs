@@ -4,7 +4,8 @@ use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError};
 use memory_addr::{
-    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
+    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned,
+    is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
 
@@ -95,6 +96,17 @@ impl AddrSpace {
         Ok(())
     }
 
+    /// check the addr alignment
+    fn validate_region_with_align(&self, start: VirtAddr, size: usize, align: usize) -> AxResult {
+        if !self.contains_range(start, size) {
+            return ax_err!(InvalidInput, "address out of range");
+        }
+        if !start.is_aligned(align) || !is_aligned(size, align) {
+            return ax_err!(InvalidInput, "address not aligned");
+        }
+        Ok(())
+    }
+
     /// Finds a free area that can accommodate the given size.
     ///
     /// The search starts from the given hint address, and the area should be within the given limit range.
@@ -107,6 +119,46 @@ impl AddrSpace {
         limit: VirtAddrRange,
     ) -> Option<VirtAddr> {
         self.areas.find_free_area(hint, size, limit)
+    }
+
+    /// find a free area with alignment
+    pub fn find_free_area_with_align(
+        &self,
+        hint: VirtAddr,
+        size: usize,
+        limit: VirtAddrRange,
+        align: usize,
+    ) -> Option<VirtAddr> {
+        let mut last_end = hint.max(limit.start).align_up(align);
+        for area in self.areas.iter() {
+            if area.end() <= last_end {
+                last_end = last_end.max(area.end().align_up(align));
+            } else {
+                break;
+            }
+        }
+        for area in self.areas.iter() {
+            let area_start = area.start();
+            if area_start < last_end {
+                continue;
+            }
+            if last_end
+                .checked_add(size)
+                .is_some_and(|end| end <= area_start)
+            {
+                return Some(last_end);
+            }
+            last_end = area.end().align_up(align);
+        }
+
+        if last_end
+            .checked_add(size)
+            .is_some_and(|end| end <= limit.end)
+        {
+            Some(last_end)
+        } else {
+            None
+        }
     }
 
     /// Add a new linear mapping.
@@ -151,10 +203,11 @@ impl AddrSpace {
         size: usize,
         flags: MappingFlags,
         populate: bool,
+        page_size: usize,
     ) -> AxResult {
-        self.validate_region(start, size)?;
+        self.validate_region_with_align(start, size, page_size)?;
 
-        let area = MemoryArea::new(start, size, flags, Backend::new_alloc(populate));
+        let area = MemoryArea::new(start, size, flags, Backend::new_alloc(populate, page_size));
         self.areas
             .map(area, &mut self.pt, false)
             .map_err(mapping_err_to_ax_err)?;
@@ -169,7 +222,11 @@ impl AddrSpace {
 
         while let Some(area) = self.areas.find(start) {
             let backend = area.backend();
-            if let Backend::Alloc { populate } = backend {
+            if let Backend::Alloc {
+                populate,
+                alignment: _,
+            } = backend
+            {
                 if !*populate {
                     for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
                         match self.pt.query(addr) {
@@ -205,10 +262,23 @@ impl AddrSpace {
     /// Returns an error if the address range is out of the address space or not
     /// aligned.
     pub fn unmap(&mut self, start: VirtAddr, size: usize) -> AxResult {
-        self.validate_region(start, size)?;
+        let mut aligned_size = size;
+        if let Some(area) = self.areas.find(start) {
+            let bk = area.backend();
+            if let Backend::Alloc {
+                populate: _,
+                alignment,
+            } = *bk
+            {
+                aligned_size = memory_addr::align_up(size, alignment);
+                self.validate_region_with_align(start, aligned_size, alignment)?;
+            } else {
+                return ax_err!(InvalidInput, "address not find");
+            }
+        }
 
         self.areas
-            .unmap(start, size, &mut self.pt)
+            .unmap(start, aligned_size, &mut self.pt)
             .map_err(mapping_err_to_ax_err)?;
         Ok(())
     }
