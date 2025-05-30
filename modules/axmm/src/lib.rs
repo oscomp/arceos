@@ -8,7 +8,6 @@ extern crate alloc;
 
 mod aspace;
 mod backend;
-mod page;
 
 pub use self::aspace::AddrSpace;
 pub use self::backend::Backend;
@@ -19,7 +18,6 @@ use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::{PhysAddr, va};
 use memory_set::MappingError;
-use page::init_page_manager;
 
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
 
@@ -65,8 +63,6 @@ pub fn init_memory_management() {
     debug!("kernel address space init OK: {:#x?}", kernel_aspace);
     KERNEL_ASPACE.init_once(SpinNoIrq::new(kernel_aspace));
     axhal::paging::set_kernel_page_table_root(kernel_page_table_root());
-
-    init_page_manager();
 }
 
 /// Initializes kernel paging for secondary CPUs.
