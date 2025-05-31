@@ -374,7 +374,7 @@ impl AddrSpace {
         if let Some(area) = self.areas.find(vaddr) {
             let orig_flags = area.flags();
             if orig_flags.contains(access_flags) {
-                if let Ok((paddr, _, _)) = self.pt.query(vaddr) {
+                if let Ok((_, _, _)) = self.pt.query(vaddr) {
                     // TODO: skip Shared
                     if !access_flags.contains(MappingFlags::WRITE) {
                         return false;
@@ -382,7 +382,7 @@ impl AddrSpace {
                     // 1. page fault caused by write
                     // 2. pte exists
                     // 3. Not shared memory
-                    return self.handle_page_fault_cow(vaddr, paddr);
+                    return self.handle_page_fault_cow(vaddr);
                 } else {
                     return area
                         .backend()
@@ -450,14 +450,12 @@ impl AddrSpace {
     ///
     /// For pages that require COW, remove `write` flags.
     pub fn copy_with_cow(&mut self) -> AxResult<Self> {
-        // TODO: huge page
         let mut new_aspace = Self::new_empty(self.base(), self.size())?;
         let new_pt = &mut new_aspace.pt;
         let old_pt = &mut self.pt;
 
+        // Copy the memory area in the new address space.
         for area in self.areas.iter() {
-            // Copy the memory area in the new address space.
-
             let mut backend = area.backend().clone();
             // TODO: Shared mem area
             match &mut backend {
@@ -467,22 +465,20 @@ impl AddrSpace {
                     populate, tracker, ..
                 } => {
                     *populate = false;
-                    for (vaddr, _) in tracker.iter() {
-                        if let Ok((paddr, mut flags, size)) = old_pt.query(vaddr) {
-                            // remove `write` flags
-                            flags.remove(MappingFlags::WRITE);
 
-                            old_pt
-                                .protect(vaddr, flags)
-                                .map(|(_, tlb)| tlb.flush())
-                                .ok();
-                            // The same physical page is mapped in the new page table
-                            new_pt
-                                .map(vaddr, paddr, size, flags)
-                                .map(|tlb| tlb.flush())
-                                .ok();
-                        }
-                    }
+                    let mut flags = area.flags();
+                    flags.remove(MappingFlags::WRITE);
+                    tracker.for_each(|(vaddr, frame)| {
+                        old_pt
+                            .protect(*vaddr, flags)
+                            .map(|(_, tlb)| tlb.flush())
+                            .ok();
+                        // The same physical page is mapped in the new page table
+                        new_pt
+                            .map(*vaddr, frame.start_paddr(), frame.size(), flags)
+                            .map(|tlb| tlb.flush())
+                            .ok();
+                    });
                 }
                 // Linear-backed regions are usually allocated by the kernel and are shared
                 Backend::Linear { .. } => (),
@@ -507,13 +503,13 @@ impl AddrSpace {
     /// # Returns
     /// - `true` if the page fault was handled successfully.
     /// - `false` if the fault handling failed (e.g., allocation failed or invalid ref count).
-    fn handle_page_fault_cow(&mut self, vaddr: VirtAddr, paddr: PhysAddr) -> bool {
+    fn handle_page_fault_cow(&mut self, vaddr: VirtAddr) -> bool {
         let area = self.areas.find(vaddr).unwrap();
         match area.backend() {
             Backend::Alloc { tracker, .. } => {
-                let old_page = tracker.find(paddr).unwrap();
+                let old_frame = tracker.find(vaddr).unwrap();
 
-                match Arc::strong_count(&old_page) {
+                match Arc::strong_count(&old_frame) {
                     ..=1 => false,
                     // There is only one AddrSpace reference to the page,
                     // so there is no need to copy it.
@@ -526,14 +522,15 @@ impl AddrSpace {
                     // Allocates the new page and copies the contents of the original page,
                     // remapping the virtual address to the physical address of the new page.
                     // NOTE: Reduce the page's reference count
+                    // TODO: huge page
                     3.. => match alloc_frame(false) {
-                        Some(new_page) => {
-                            new_page.copy_from(old_page.clone());
-                            tracker.remove(old_page.start_paddr());
+                        Some(new_frame) => {
+                            new_frame.copy_from(old_frame.clone());
+                            tracker.remove(old_frame.start_paddr());
+                            tracker.insert(vaddr, new_frame.clone());
                             self.pt
-                                .remap(vaddr, new_page.start_paddr(), area.flags())
+                                .remap(vaddr, new_frame.start_paddr(), area.flags())
                                 .map(|(_, tlb)| {
-                                    tracker.insert(vaddr, new_page);
                                     tlb.flush();
                                 })
                                 .is_ok()

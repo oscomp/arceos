@@ -7,57 +7,62 @@ use axhal::{
 use kspin::SpinRaw;
 use memory_addr::{PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr};
 
+use crate::{PAGE_SIZE_1G, PAGE_SIZE_2M};
+
 use super::Backend;
 
-pub struct PageTracker {
-    inner: SpinRaw<Vec<(VirtAddr, Arc<Page>)>>,
+pub struct FrameTracker {
+    inner: SpinRaw<Vec<(VirtAddr, Arc<Frame>)>>,
 }
 
-impl PageTracker {
+impl FrameTracker {
     fn new() -> Self {
         Self {
             inner: SpinRaw::new(Vec::new()),
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (VirtAddr, Arc<Page>)> {
-        self.inner.lock().clone().into_iter()
+    pub fn for_each<F>(&self, f: F)
+    where
+        F: FnMut(&(VirtAddr, Arc<Frame>)),
+    {
+        self.inner.lock().iter().for_each(f);
     }
 
-    pub fn find(&self, paddr: PhysAddr) -> Option<Arc<Page>> {
+    pub fn find(&self, addr: VirtAddr) -> Option<Arc<Frame>> {
         self.inner
             .lock()
             .iter()
-            .find(|(_, page)| page.contains(paddr))
-            .map(|(_, page)| page.clone())
+            .find(|(vaddr, frame)| *vaddr <= addr && addr <= *vaddr + frame.size().into())
+            .map(|(_, frame)| frame.clone())
     }
 
-    pub fn insert(&self, vaddr: VirtAddr, page: Arc<Page>) {
-        self.inner.lock().push((vaddr, page));
+    pub fn insert(&self, vaddr: VirtAddr, frame: Arc<Frame>) {
+        self.inner.lock().push((vaddr, frame));
     }
 
-    pub fn remove(&self, frame: PhysAddr) {
+    pub fn remove(&self, paddr: PhysAddr) {
         let mut vec = self.inner.lock();
         let index = vec
             .iter()
-            .position(|(_, page)| page.contains(frame))
+            .position(|(_, frame)| frame.contains(paddr))
             .expect("Tried to remove a frame that was not present");
         vec.remove(index);
     }
 }
 
-pub struct Page {
+pub struct Frame {
     inner: SpinRaw<GlobalPage>,
 }
 
-impl Page {
+impl Frame {
     fn new(page: GlobalPage) -> Self {
         Self {
             inner: SpinRaw::new(page),
         }
     }
 
-    pub fn copy_from(&self, other: Arc<Page>) {
+    pub fn copy_from(&self, other: Arc<Frame>) {
         self.inner
             .lock()
             .as_slice_mut()
@@ -74,9 +79,18 @@ impl Page {
     pub fn start_paddr(&self) -> PhysAddr {
         self.inner.lock().start_paddr(virt_to_phys)
     }
+
+    pub fn size(&self) -> PageSize {
+        match self.inner.lock().size() {
+            PAGE_SIZE_4K => PageSize::Size4K,
+            PAGE_SIZE_2M => PageSize::Size2M,
+            PAGE_SIZE_1G => PageSize::Size1G,
+            _ => unreachable!(),
+        }
+    }
 }
 
-pub fn alloc_frame(zeroed: bool) -> Option<Arc<Page>> {
+pub fn alloc_frame(zeroed: bool) -> Option<Arc<Frame>> {
     GlobalPage::alloc_contiguous(1, PAGE_SIZE_4K)
         .ok()
         .map(|mut page| {
@@ -84,7 +98,7 @@ pub fn alloc_frame(zeroed: bool) -> Option<Arc<Page>> {
                 page.zero();
             }
 
-            Arc::new(Page::new(page))
+            Arc::new(Frame::new(page))
         })
 }
 
@@ -93,7 +107,7 @@ impl Backend {
     pub fn new_alloc(populate: bool) -> Self {
         Self::Alloc {
             populate,
-            tracker: Arc::new(PageTracker::new()),
+            tracker: Arc::new(FrameTracker::new()),
         }
     }
 
@@ -103,7 +117,7 @@ impl Backend {
         flags: MappingFlags,
         pt: &mut PageTable,
         populate: bool,
-        trakcer: Arc<PageTracker>,
+        trakcer: Arc<FrameTracker>,
     ) -> bool {
         debug!(
             "map_alloc: [{:#x}, {:#x}) {:?} (populate={})",
@@ -135,7 +149,7 @@ impl Backend {
         size: usize,
         pt: &mut PageTable,
         _populate: bool,
-        tracker: Arc<PageTracker>,
+        tracker: Arc<FrameTracker>,
     ) -> bool {
         debug!("unmap_alloc: [{:#x}, {:#x})", start, start + size);
         for addr in PageIter4K::new(start, start + size).unwrap() {
@@ -159,7 +173,7 @@ impl Backend {
         orig_flags: MappingFlags,
         pt: &mut PageTable,
         populate: bool,
-        tracker: Arc<PageTracker>,
+        tracker: Arc<FrameTracker>,
     ) -> bool {
         if populate {
             false // Populated mappings should not trigger page faults.

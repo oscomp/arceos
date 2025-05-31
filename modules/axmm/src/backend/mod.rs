@@ -1,7 +1,7 @@
 //! Memory mapping backends.
 
 use ::alloc::sync::Arc;
-use alloc::PageTracker;
+use alloc::FrameTracker;
 use axhal::paging::{MappingFlags, PageTable};
 use memory_addr::VirtAddr;
 use memory_set::MappingBackend;
@@ -39,7 +39,7 @@ pub enum Backend {
     Alloc {
         /// Whether to populate the physical frames when creating the mapping.
         populate: bool,
-        tracker: Arc<PageTracker>,
+        tracker: Arc<FrameTracker>,
     },
 }
 
