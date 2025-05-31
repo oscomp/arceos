@@ -374,7 +374,7 @@ impl AddrSpace {
         if let Some(area) = self.areas.find(vaddr) {
             let orig_flags = area.flags();
             if orig_flags.contains(access_flags) {
-                if let Ok((_, _, _)) = self.pt.query(vaddr) {
+                if let Ok(_) = self.pt.query(vaddr) {
                     // TODO: skip Shared
                     if !access_flags.contains(MappingFlags::WRITE) {
                         return false;
