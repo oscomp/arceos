@@ -1,5 +1,6 @@
 use core::fmt;
 
+use alloc::sync::Arc;
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError};
@@ -8,7 +9,7 @@ use memory_addr::{
 };
 use memory_set::{MemoryArea, MemorySet};
 
-use crate::backend::Backend;
+use crate::backend::{Backend, alloc_frame};
 use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.
@@ -169,7 +170,7 @@ impl AddrSpace {
 
         while let Some(area) = self.areas.find(start) {
             let backend = area.backend();
-            if let Backend::Alloc { populate } = backend {
+            if let Backend::Alloc { populate, .. } = backend {
                 if !*populate {
                     for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
                         match self.pt.query(addr) {
@@ -373,9 +374,20 @@ impl AddrSpace {
         if let Some(area) = self.areas.find(vaddr) {
             let orig_flags = area.flags();
             if orig_flags.contains(access_flags) {
-                return area
-                    .backend()
-                    .handle_page_fault(vaddr, orig_flags, &mut self.pt);
+                if let Ok(_) = self.pt.query(vaddr) {
+                    // TODO: skip Shared
+                    if !access_flags.contains(MappingFlags::WRITE) {
+                        return false;
+                    }
+                    // 1. page fault caused by write
+                    // 2. pte exists
+                    // 3. Not shared memory
+                    return self.handle_page_fault_cow(vaddr);
+                } else {
+                    return area
+                        .backend()
+                        .handle_page_fault(vaddr, orig_flags, &mut self.pt);
+                }
             }
         }
         false
@@ -433,6 +445,103 @@ impl AddrSpace {
         }
         Ok(new_aspace)
     }
+
+    /// Creates a copy of the current [`AddrSpace`] with copy-on-write (COW)
+    ///
+    /// For pages that require COW, remove `write` flags.
+    pub fn copy_with_cow(&mut self) -> AxResult<Self> {
+        let mut new_aspace = Self::new_empty(self.base(), self.size())?;
+        let new_pt = &mut new_aspace.pt;
+        let old_pt = &mut self.pt;
+
+        // Copy the memory area in the new address space.
+        for area in self.areas.iter() {
+            let mut backend = area.backend().clone();
+            // TODO: Shared mem area
+            match &mut backend {
+                // Forcing `populate = false` is to prevent the subsequent `new_aspace.areas.map`
+                // from mapping page table entries for the virtual addresses.
+                Backend::Alloc {
+                    populate, tracker, ..
+                } => {
+                    *populate = false;
+
+                    let mut flags = area.flags();
+                    flags.remove(MappingFlags::WRITE);
+                    tracker.for_each(|(vaddr, frame)| {
+                        old_pt
+                            .protect(*vaddr, flags)
+                            .map(|(_, tlb)| tlb.flush())
+                            .ok();
+                        // The same physical page is mapped in the new page table
+                        new_pt
+                            .map(*vaddr, frame.start_paddr(), frame.size(), flags)
+                            .map(|tlb| tlb.flush())
+                            .ok();
+                    });
+                }
+                // Linear-backed regions are usually allocated by the kernel and are shared
+                Backend::Linear { .. } => (),
+            }
+
+            let new_area = MemoryArea::new(area.start(), area.size(), area.flags(), backend);
+            new_aspace
+                .areas
+                .map(new_area, new_pt, false)
+                .map_err(mapping_err_to_ax_err)?;
+        }
+
+        Ok(new_aspace)
+    }
+
+    /// Handles a Copy-On-Write (COW) page fault.
+    ///
+    /// # Arguments
+    /// - `vaddr`: The virtual address that triggered the fault.
+    /// - `paddr`: The physical address currently mapped to the faulting virtual address.
+    ///
+    /// # Returns
+    /// - `true` if the page fault was handled successfully.
+    /// - `false` if the fault handling failed (e.g., allocation failed or invalid ref count).
+    fn handle_page_fault_cow(&mut self, vaddr: VirtAddr) -> bool {
+        let area = self.areas.find(vaddr).unwrap();
+        match area.backend() {
+            Backend::Alloc { tracker, .. } => {
+                let old_frame = tracker.find(vaddr).unwrap();
+
+                match Arc::strong_count(&old_frame) {
+                    ..=1 => false,
+                    // There is only one AddrSpace reference to the page,
+                    // so there is no need to copy it.
+                    2 => self
+                        .pt
+                        .protect(vaddr, area.flags())
+                        .map(|(_, tlb)| tlb.flush())
+                        .is_ok(),
+
+                    // Allocates the new page and copies the contents of the original page,
+                    // remapping the virtual address to the physical address of the new page.
+                    // NOTE: Reduce the page's reference count
+                    // TODO: huge page
+                    3.. => match alloc_frame(false) {
+                        Some(new_frame) => {
+                            new_frame.copy_from(old_frame.clone());
+                            tracker.remove(old_frame.start_paddr());
+                            tracker.insert(vaddr, new_frame.clone());
+                            self.pt
+                                .remap(vaddr, new_frame.start_paddr(), area.flags())
+                                .map(|(_, tlb)| {
+                                    tlb.flush();
+                                })
+                                .is_ok()
+                        }
+                        None => false,
+                    },
+                }
+            }
+            Backend::Linear { .. } => false,
+        }
+    }
 }
 
 impl fmt::Debug for AddrSpace {
@@ -447,6 +556,7 @@ impl fmt::Debug for AddrSpace {
 
 impl Drop for AddrSpace {
     fn drop(&mut self) {
+        debug!("AddrSpace drop ..... ");
         self.clear();
     }
 }

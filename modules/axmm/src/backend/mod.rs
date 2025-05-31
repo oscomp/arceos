@@ -1,11 +1,15 @@
 //! Memory mapping backends.
 
+use ::alloc::sync::Arc;
+use alloc::FrameTracker;
 use axhal::paging::{MappingFlags, PageTable};
 use memory_addr::VirtAddr;
 use memory_set::MappingBackend;
 
 mod alloc;
 mod linear;
+
+pub use alloc::alloc_frame;
 
 /// A unified enum type for different memory mapping backends.
 ///
@@ -35,6 +39,7 @@ pub enum Backend {
     Alloc {
         /// Whether to populate the physical frames when creating the mapping.
         populate: bool,
+        tracker: Arc<FrameTracker>,
     },
 }
 
@@ -43,16 +48,22 @@ impl MappingBackend for Backend {
     type Flags = MappingFlags;
     type PageTable = PageTable;
     fn map(&self, start: VirtAddr, size: usize, flags: MappingFlags, pt: &mut PageTable) -> bool {
-        match *self {
-            Self::Linear { pa_va_offset } => Self::map_linear(start, size, flags, pt, pa_va_offset),
-            Self::Alloc { populate } => Self::map_alloc(start, size, flags, pt, populate),
+        match self {
+            Self::Linear { pa_va_offset } => {
+                Self::map_linear(start, size, flags, pt, *pa_va_offset)
+            }
+            Self::Alloc { populate, tracker } => {
+                Self::map_alloc(start, size, flags, pt, *populate, tracker.clone())
+            }
         }
     }
 
     fn unmap(&self, start: VirtAddr, size: usize, pt: &mut PageTable) -> bool {
-        match *self {
-            Self::Linear { pa_va_offset } => Self::unmap_linear(start, size, pt, pa_va_offset),
-            Self::Alloc { populate } => Self::unmap_alloc(start, size, pt, populate),
+        match self {
+            Self::Linear { pa_va_offset } => Self::unmap_linear(start, size, pt, *pa_va_offset),
+            Self::Alloc { populate, tracker } => {
+                Self::unmap_alloc(start, size, pt, *populate, tracker.clone())
+            }
         }
     }
 
@@ -77,11 +88,15 @@ impl Backend {
         orig_flags: MappingFlags,
         page_table: &mut PageTable,
     ) -> bool {
-        match *self {
+        match self {
             Self::Linear { .. } => false, // Linear mappings should not trigger page faults.
-            Self::Alloc { populate } => {
-                Self::handle_page_fault_alloc(vaddr, orig_flags, page_table, populate)
-            }
+            Self::Alloc { populate, tracker } => Self::handle_page_fault_alloc(
+                vaddr,
+                orig_flags,
+                page_table,
+                *populate,
+                tracker.clone(),
+            ),
         }
     }
 }
