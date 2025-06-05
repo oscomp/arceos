@@ -1,4 +1,4 @@
-use core::fmt;
+use core::{error, fmt};
 
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
@@ -7,6 +7,7 @@ use memory_addr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
+use axhal::arch::flush_tlb;
 
 use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
@@ -37,6 +38,26 @@ impl AddrSpace {
     /// Returns the reference to the inner page table.
     pub const fn page_table(&self) -> &PageTable {
         &self.pt
+    }
+
+    pub fn check_page_dirty(&mut self, vaddr: VirtAddr) -> bool {
+        // 必须要刷新 tlb，否则会导致标志位不同步！
+        flush_tlb(Some(vaddr));
+        self.pt.is_dirty(vaddr).unwrap()
+    }
+    
+    pub fn set_page_dirty(&mut self, vaddr: VirtAddr, dirty: bool) {
+        self.pt.set_dirty(vaddr, dirty).unwrap();
+    }
+    
+    pub fn check_page_access(&mut self, vaddr: VirtAddr) -> bool {
+        // 必须要刷新 tlb，否则会导致标志位不同步！
+        flush_tlb(Some(vaddr));
+        self.pt.is_accessed(vaddr).unwrap()
+    }
+
+    pub fn set_page_access(&mut self, vaddr: VirtAddr, access: bool) {
+        self.pt.set_accessed(vaddr, access).unwrap();
     }
 
     /// Returns the root physical address of the inner page table.
@@ -161,36 +182,6 @@ impl AddrSpace {
         Ok(())
     }
 
-    pub fn map_shm(
-        &mut self,
-        start: VirtAddr,
-        size: usize,
-        flags: MappingFlags,
-        populate: bool,
-    ) -> AxResult {
-        panic!("Unimplement");
-    }
-
-    /// Add a new file mapping
-    pub fn map_file(
-        &mut self,
-        start: VirtAddr,
-        size: usize,
-        flags: MappingFlags,
-        fd: i32,
-        offset: usize,
-        shared: bool,
-        populate: bool,
-    ) -> AxResult {
-        self.validate_region(start, size)?;
-        // warn!("map file flags: {}", flags.contains(MappingFlags::WRITE));
-        let area = MemoryArea::new(start, size, flags, Backend::new_file(fd, offset, shared, populate));
-        self.areas
-            .map(area, &mut self.pt, false)
-            .map_err(mapping_err_to_ax_err)?;
-        Ok(())
-    }
-
     /// Forcely set the page table
     pub fn force_map_page(
         &mut self, 
@@ -212,6 +203,19 @@ impl AddrSpace {
         };
         true
     }
+
+
+    pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
+        match self.areas.find(vaddr) {
+            Some(_) => {
+                self.pt.unmap(vaddr)
+                    .map(|_| true)
+                    .unwrap_or_else(|_| panic!("FORCE FORCE PAGE FAILED(PAGE TABLE FAILEDA): {:#x}!", vaddr));
+            },
+            _ => panic!("FORCE UNMAP PAGE FAILED(NO AREA): {:#x}!", vaddr),
+        };
+    }
+
 
     /// Populates the area with physical frames, returning false if the area
     /// contains unmapped area.
@@ -410,21 +414,6 @@ impl AddrSpace {
         }
 
         false
-    }
-
-    /// Returns (fd, offset, shared, popoulate, virtaddr_start)
-    pub fn get_file_metadata(&mut self, vaddr: VirtAddr) -> Option<(i32, usize, bool, bool, VirtAddr)> {
-        if !self.va_range.contains(vaddr) {
-            return None;
-        }
-        if let Some(area) = self.areas.find(vaddr) {
-            match area.backend() {
-                Backend::File { fd, offset, shared, populate } 
-                    => return Some((*fd, *offset, *shared, *populate, area.start())),
-                _ => return None,
-            }
-        }
-        None
     }
 
     /// Handles a page fault at the given address.

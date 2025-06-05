@@ -54,6 +54,10 @@ pub struct MemRegion {
 /// `paddr = vaddr - PHYS_VIRT_OFFSET`.
 #[inline]
 pub const fn virt_to_phys(vaddr: VirtAddr) -> PhysAddr {
+    assert!(
+        vaddr.as_usize() >= PHYS_VIRT_OFFSET,
+        "Converted address is invalid, check if the virtual address is in kernel space"
+    );
     pa!(vaddr.as_usize() - PHYS_VIRT_OFFSET)
 }
 
