@@ -1,3 +1,4 @@
+use alloc::vec;
 use axerrno::AxResult;
 use axio::{BufReader, prelude::*};
 use axsync::Mutex;
@@ -6,7 +7,10 @@ use axsync::Mutex;
 use {alloc::sync::Arc, axerrno::LinuxError, axerrno::LinuxResult, axio::PollState};
 
 fn console_read_bytes(buf: &mut [u8]) -> AxResult<usize> {
-    let len = axhal::console::read_bytes(buf);
+    // we must make sure the buffer is in kernel memory
+    let mut kernel_buf = vec![0u8; buf.len()];
+    let len = axhal::console::read_bytes(&mut kernel_buf);
+    buf.copy_from_slice(&kernel_buf);
     for c in &mut buf[..len] {
         if *c == b'\r' {
             *c = b'\n';

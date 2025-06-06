@@ -70,7 +70,11 @@ impl Disk {
     pub fn write_one(&mut self, buf: &[u8]) -> DevResult<usize> {
         let write_size = if self.offset == 0 && buf.len() >= BLOCK_SIZE {
             // whole block
-            self.dev.write_block(self.block_id, &buf[0..BLOCK_SIZE])?;
+            // copy data to kernel address space
+            // Because underlying driver assumes a linear mapping between virtual address and
+            // physical address when converting them, which is only present in kernel address space.
+            let data = buf[0..BLOCK_SIZE].to_vec();
+            self.dev.write_block(self.block_id, &data)?;
             self.block_id += 1;
             BLOCK_SIZE
         } else {
