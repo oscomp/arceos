@@ -1,6 +1,5 @@
 use core::fmt;
 
-use alloc::sync::Arc;
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError};
@@ -10,7 +9,8 @@ use memory_addr::{
 use memory_set::{MemoryArea, MemorySet};
 use page_table_multiarch::PageSize;
 
-use crate::backend::{Backend, alloc_frame};
+use crate::backend::{Backend, alloc_frame, dealloc_frame};
+use crate::frameinfo::{add_frame_ref, get_frame_info};
 use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.
@@ -383,7 +383,13 @@ impl AddrSpace {
                     // 1. page fault caused by write
                     // 2. pte exists
                     // 3. Not shared memory
-                    return self.handle_page_fault_cow(vaddr, paddr, page_size);
+                    let off = page_size.align_offset(vaddr.into());
+                    return self.handle_cow_fault(
+                        vaddr,
+                        paddr.sub(off),
+                        orig_flags,
+                        page_size,
+                    );
                 } else {
                     return area
                         .backend()
@@ -480,6 +486,8 @@ impl AddrSpace {
                         .expect("Failed to create page iterator")
                     {
                         if let Ok((paddr, _, page_size)) = old_pt.query(vaddr) {
+                            add_frame_ref(paddr);
+
                             old_pt
                                 .protect(vaddr, flags)
                                 .map(|(_, tlb)| tlb.flush())
@@ -509,55 +517,57 @@ impl AddrSpace {
     ///
     /// # Arguments
     /// - `vaddr`: The virtual address that triggered the fault.
-    /// - `paddr`: The physical address currently mapped to the faulting virtual address.
+    /// - `paddr`: It must be an aligned physical address; if it's a huge page,
+    /// it must be the starting physical address.
+    /// - `page_size`: The size of the page on which the current physical address is located
     ///
     /// # Returns
     /// - `true` if the page fault was handled successfully.
     /// - `false` if the fault handling failed (e.g., allocation failed or invalid ref count).
-    fn handle_page_fault_cow(
+    fn handle_cow_fault(
         &mut self,
         vaddr: VirtAddr,
         paddr: PhysAddr,
+        flags: MappingFlags,
         page_size: PageSize,
     ) -> bool {
-        let area = self.areas.find(vaddr).unwrap();
-        match area.backend() {
-            Backend::Alloc { tracker, .. } => {
-                let old_frame = match tracker.find(paddr) {
-                    Some(frame) => frame,
-                    None => return false,
-                };
+        let frame_info = get_frame_info(paddr);
+        match frame_info.ref_count() {
+            0 => unreachable!(),
+            // There is only one AddrSpace reference to the page,
+            // so there is no need to copy it.
+            1 => self
+                .pt
+                .protect(vaddr, flags)
+                .map(|(_, tlb)| tlb.flush())
+                .is_ok(),
+            // Allocates the new page and copies the contents of the original page,
+            // remapping the virtual address to the physical address of the new page.
+            // NOTE: Reduce the page's reference count
+            2.. => match alloc_frame(false, page_size.into()) {
+                Some(new_frame) => {
+                    let new_slice = unsafe {
+                        core::slice::from_raw_parts_mut(
+                            phys_to_virt(new_frame).as_mut_ptr(),
+                            page_size.into(),
+                        )
+                    };
+                    let old_slice = unsafe {
+                        core::slice::from_raw_parts(phys_to_virt(paddr).as_ptr(), page_size.into())
+                    };
 
-                match Arc::strong_count(&old_frame) {
-                    ..=1 => false,
-                    // There is only one AddrSpace reference to the page,
-                    // so there is no need to copy it.
-                    2 => self
-                        .pt
-                        .protect(vaddr, area.flags())
-                        .map(|(_, tlb)| tlb.flush())
-                        .is_ok(),
+                    new_slice.copy_from_slice(old_slice);
+                    dealloc_frame(paddr);
 
-                    // Allocates the new page and copies the contents of the original page,
-                    // remapping the virtual address to the physical address of the new page.
-                    // NOTE: Reduce the page's reference count
-                    3.. => match alloc_frame(false, page_size.into()) {
-                        Some(new_frame) => {
-                            new_frame.copy_from(old_frame.clone());
-                            tracker.remove(old_frame.start_paddr());
-                            tracker.insert(new_frame.clone());
-                            self.pt
-                                .remap(vaddr, new_frame.start_paddr(), area.flags())
-                                .map(|(_, tlb)| {
-                                    tlb.flush();
-                                })
-                                .is_ok()
-                        }
-                        None => false,
-                    },
+                    self.pt
+                        .remap(vaddr, new_frame, flags)
+                        .map(|(_, tlb)| {
+                            tlb.flush();
+                        })
+                        .is_ok()
                 }
-            }
-            Backend::Linear { .. } => false,
+                None => false,
+            },
         }
     }
 }
@@ -574,7 +584,6 @@ impl fmt::Debug for AddrSpace {
 
 impl Drop for AddrSpace {
     fn drop(&mut self) {
-        debug!("AddrSpace drop ..... ");
         self.clear();
     }
 }

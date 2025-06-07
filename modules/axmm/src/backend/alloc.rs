@@ -1,115 +1,52 @@
-use alloc::{sync::Arc, vec::Vec};
-use axalloc::GlobalPage;
+use axalloc::global_allocator;
 use axhal::{
-    mem::virt_to_phys,
+    mem::{phys_to_virt, virt_to_phys},
     paging::{MappingFlags, PageSize, PageTable},
 };
-use kspin::SpinNoIrq;
 use memory_addr::{PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr};
+
+use crate::frameinfo::{add_frame_ref, dec_frame_ref};
 
 use super::Backend;
 
-pub struct FrameTracker {
-    inner: SpinNoIrq<Vec<Arc<Frame>>>,
-}
-
-impl FrameTracker {
-    fn new() -> Self {
-        Self {
-            inner: SpinNoIrq::new(Vec::new()),
-        }
-    }
-
-    pub fn for_each<F>(&self, f: F)
-    where
-        F: FnMut(&Arc<Frame>),
-    {
-        self.inner.lock().iter().for_each(f);
-    }
-
-    pub fn find(&self, paddr: PhysAddr) -> Option<Arc<Frame>> {
-        self.inner
-            .lock()
-            .iter()
-            .find(|frame| frame.contains(paddr))
-            .map(|frame| frame.clone())
-    }
-
-    pub fn insert(&self, frame: Arc<Frame>) {
-        self.inner.lock().push(frame);
-    }
-
-    pub fn remove(&self, paddr: PhysAddr) {
-        let mut vec = self.inner.lock();
-        let index = vec
-            .iter()
-            .position(|frame| frame.contains(paddr))
-            .expect("Tried to remove a frame that was not present");
-        vec.remove(index);
-    }
-}
-
-pub struct Frame {
-    inner: SpinNoIrq<GlobalPage>,
-}
-
-impl Frame {
-    fn new(page: GlobalPage) -> Self {
-        Self {
-            inner: SpinNoIrq::new(page),
-        }
-    }
-
-    pub fn copy_from(&self, other: Arc<Frame>) {
-        self.inner
-            .lock()
-            .as_slice_mut()
-            .copy_from_slice(other.inner.lock().as_slice());
-    }
-
-    pub fn contains(&self, paddr: PhysAddr) -> bool {
-        let start = self.start_paddr();
-        let size = self.inner.lock().size();
-        // left-closed, right-open interval
-        start <= paddr && paddr < start + size
-    }
-
-    pub fn start_paddr(&self) -> PhysAddr {
-        self.inner.lock().start_paddr(virt_to_phys)
-    }
-}
-
-/// Allocates a physical memory frame and optionally zeroes it.
+/// Allocates a single physical frame with optional zero-initialization and alignment.
 ///
 /// # Parameters
-///
-/// - `zeroed`: A boolean indicating whether the allocated frame should be zero-initialized.
+/// - `zeroed`: If `true`, the allocated frame memory is zeroed out.
+/// - `align`: The alignment requirement (in pages) for the allocation.
 ///
 /// # Returns
-///
-/// Returns an `Option<Arc<Frame>>`:
-/// - `Some(Arc<Frame>)`: Allocation succeeded; the frame is wrapped in a reference-counted pointer.
-/// - `None`: Allocation failed (e.g., out of memory).
-pub fn alloc_frame(zeroed: bool, page_size: usize) -> Option<Arc<Frame>> {
-    let page_num = page_size / PAGE_SIZE_4K;
-    GlobalPage::alloc_contiguous(page_num, page_size)
-        .ok()
-        .map(|mut page| {
-            if zeroed {
-                page.zero();
-            }
+/// Returns `Some(PhysAddr)` of the allocated frame on success, or `None` if allocation fails.
+pub fn alloc_frame(zeroed: bool, align: usize) -> Option<PhysAddr> {
+    let vaddr = VirtAddr::from(global_allocator().alloc_pages(1, align).ok()?);
+    if zeroed {
+        unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, align) };
+    }
+    let paddr = virt_to_phys(vaddr);
+    add_frame_ref(paddr);
+    Some(paddr)
+}
 
-            Arc::new(Frame::new(page))
-        })
+/// Deallocates a previously allocated physical frame.
+///
+/// This function decreases the reference count associated with the frame.
+/// When the reference count reaches 1, it actually frees the frame memory.
+///
+/// # Parameters
+/// - `frame`: The physical address of the frame to deallocate.
+pub fn dealloc_frame(frame: PhysAddr) {
+    let vaddr = phys_to_virt(frame);
+    match dec_frame_ref(frame) {
+        0 => unreachable!(),
+        1 => global_allocator().dealloc_pages(vaddr.as_usize(), 1),
+        _ => (),
+    }
 }
 
 impl Backend {
     /// Creates a new allocation mapping backend.
     pub fn new_alloc(populate: bool) -> Self {
-        Self::Alloc {
-            populate,
-            tracker: Arc::new(FrameTracker::new()),
-        }
+        Self::Alloc { populate }
     }
 
     pub(crate) fn map_alloc(
@@ -118,7 +55,6 @@ impl Backend {
         flags: MappingFlags,
         pt: &mut PageTable,
         populate: bool,
-        trakcer: Arc<FrameTracker>,
     ) -> bool {
         debug!(
             "map_alloc: [{:#x}, {:#x}) {:?} (populate={})",
@@ -130,9 +66,8 @@ impl Backend {
         if populate {
             // allocate all possible physical frames for populated mapping.
             for addr in PageIter4K::new(start, start + size).unwrap() {
-                if let Some(page) = alloc_frame(true, PAGE_SIZE_4K) {
-                    if let Ok(tlb) = pt.map(addr, page.start_paddr(), PageSize::Size4K, flags) {
-                        trakcer.insert(page);
+                if let Some(frame) = alloc_frame(true, PAGE_SIZE_4K) {
+                    if let Ok(tlb) = pt.map(addr, frame, PageSize::Size4K, flags) {
                         tlb.ignore(); // TLB flush on map is unnecessary, as there are no outdated mappings.
                     } else {
                         return false;
@@ -150,7 +85,6 @@ impl Backend {
         size: usize,
         pt: &mut PageTable,
         _populate: bool,
-        tracker: Arc<FrameTracker>,
     ) -> bool {
         debug!("unmap_alloc: [{:#x}, {:#x})", start, start + size);
         for addr in PageIter4K::new(start, start + size).unwrap() {
@@ -161,7 +95,8 @@ impl Backend {
                     return false;
                 }
                 tlb.flush();
-                tracker.remove(frame);
+
+                dealloc_frame(frame);
             } else {
                 // Deallocation is needn't if the page is not mapped.
             }
@@ -174,19 +109,15 @@ impl Backend {
         orig_flags: MappingFlags,
         pt: &mut PageTable,
         populate: bool,
-        tracker: Arc<FrameTracker>,
     ) -> bool {
         if populate {
             false // Populated mappings should not trigger page faults.
-        } else if let Some(page) = alloc_frame(true, PAGE_SIZE_4K) {
+        } else if let Some(frame) = alloc_frame(true, PAGE_SIZE_4K) {
             // Allocate a physical frame lazily and map it to the fault address.
             // `vaddr` does not need to be aligned. It will be automatically
             // aligned during `pt.map` regardless of the page size.
-            pt.map(vaddr, page.start_paddr(), PageSize::Size4K, orig_flags)
-                .map(|tlb| {
-                    tracker.insert(page);
-                    tlb.flush()
-                })
+            pt.map(vaddr, frame, PageSize::Size4K, orig_flags)
+                .map(|tlb| tlb.flush())
                 .is_ok()
         } else {
             false
