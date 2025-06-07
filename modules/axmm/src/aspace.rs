@@ -375,21 +375,18 @@ impl AddrSpace {
         if let Some(area) = self.areas.find(vaddr) {
             let orig_flags = area.flags();
             if orig_flags.contains(access_flags) {
+                // Two cases enter the branch:
+                // - shared pages (If there is a shared page in the vma)
+                // - cow
                 if let Ok((paddr, _, page_size)) = self.pt.query(vaddr) {
-                    // TODO: skip Shared
                     if !access_flags.contains(MappingFlags::WRITE) {
                         return false;
                     }
+                    let off = page_size.align_offset(vaddr.into());
                     // 1. page fault caused by write
                     // 2. pte exists
                     // 3. Not shared memory
-                    let off = page_size.align_offset(vaddr.into());
-                    return self.handle_cow_fault(
-                        vaddr,
-                        paddr.sub(off),
-                        orig_flags,
-                        page_size,
-                    );
+                    return self.handle_cow_fault(vaddr, paddr.sub(off), orig_flags, page_size);
                 } else {
                     return area
                         .backend()
@@ -405,10 +402,7 @@ impl AddrSpace {
         let mut new_aspace = Self::new_empty(self.base(), self.size())?;
 
         for area in self.areas.iter() {
-            let backend = match area.backend() {
-                Backend::Alloc { populate, .. } => Backend::new_alloc(*populate),
-                Backend::Linear { .. } => area.backend().clone(),
-            };
+            let backend = area.backend();
 
             // Remap the memory area in the new address space.
             let new_area =
@@ -467,47 +461,48 @@ impl AddrSpace {
 
         for area in self.areas.iter() {
             let mut backend = area.backend().clone();
-            // TODO: Shared mem area
-            match &mut backend {
+            if let Backend::Alloc { populate, .. } = &mut backend {
                 // Forcing `populate = false` is to prevent the subsequent `new_aspace.areas.map`
                 // from mapping page table entries for the virtual addresses.
-                Backend::Alloc { populate, .. } => {
-                    *populate = false;
-
-                    let mut flags = area.flags();
-                    flags.remove(MappingFlags::WRITE);
-
-                    //If the page is mapped in the old page table:
-                    // - Update its permissions in the old page table using `flags`.
-                    // - Map the same physical page into the new page table at the same
-                    // virtual address, with the same page size and `flags`.
-                    // TODO: huge page
-                    for vaddr in PageIter4K::new(area.start(), area.end())
-                        .expect("Failed to create page iterator")
-                    {
-                        if let Ok((paddr, _, page_size)) = old_pt.query(vaddr) {
-                            add_frame_ref(paddr);
-
-                            old_pt
-                                .protect(vaddr, flags)
-                                .map(|(_, tlb)| tlb.flush())
-                                .ok();
-                            new_pt
-                                .map(vaddr, paddr, page_size, flags)
-                                .map(|tlb| tlb.flush())
-                                .ok();
-                        }
-                    }
-                }
-                // Linear-backed regions are usually allocated by the kernel and are shared
-                Backend::Linear { .. } => (),
+                *populate = false
             }
 
-            let new_area = MemoryArea::new(area.start(), area.size(), area.flags(), backend);
+            let new_area =
+                MemoryArea::new(area.start(), area.size(), area.flags(), backend.clone());
             new_aspace
                 .areas
                 .map(new_area, new_pt, false)
                 .map_err(mapping_err_to_ax_err)?;
+
+            // Linear-backed regions are usually allocated by the kernel and are shared
+            if matches!(backend, Backend::Linear { .. }) {
+                continue;
+            }
+
+            let mut flags = area.flags();
+            flags.remove(MappingFlags::WRITE);
+            //If the page is mapped in the old page table:
+            // - Update its permissions in the old page table using `flags`.
+            // - Map the same physical page into the new page table at the same
+            // virtual address, with the same page size and `flags`.
+            // TODO: huge page iter
+            for vaddr in
+                PageIter4K::new(area.start(), area.end()).expect("Failed to create page iterator")
+            {
+                if let Ok((paddr, _, page_size)) = old_pt.query(vaddr) {
+                    // FIXME: need use huge page iter
+                    add_frame_ref(paddr);
+
+                    old_pt
+                        .protect(vaddr, flags)
+                        .map(|(_, tlb)| tlb.flush())
+                        .ok();
+                    new_pt
+                        .map(vaddr, paddr, page_size, flags)
+                        .map(|tlb| tlb.flush())
+                        .ok();
+                }
+            }
         }
 
         Ok(new_aspace)
@@ -519,6 +514,7 @@ impl AddrSpace {
     /// - `vaddr`: The virtual address that triggered the fault.
     /// - `paddr`: It must be an aligned physical address; if it's a huge page,
     /// it must be the starting physical address.
+    /// - `flags`: vma flags.
     /// - `page_size`: The size of the page on which the current physical address is located
     ///
     /// # Returns
