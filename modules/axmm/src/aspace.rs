@@ -496,11 +496,11 @@ impl AddrSpace {
                     old_pt
                         .protect(vaddr, flags)
                         .map(|(_, tlb)| tlb.flush())
-                        .ok();
+                        .expect("protect failed");
                     new_pt
                         .map(vaddr, paddr, page_size, flags)
                         .map(|tlb| tlb.flush())
-                        .ok();
+                        .expect("map failed");
                 }
             }
         }
@@ -539,20 +539,16 @@ impl AddrSpace {
                 .is_ok(),
             // Allocates the new page and copies the contents of the original page,
             // remapping the virtual address to the physical address of the new page.
-            // NOTE: Reduce the page's reference count
             2.. => match alloc_frame(false, page_size.into()) {
                 Some(new_frame) => {
-                    let new_slice = unsafe {
-                        core::slice::from_raw_parts_mut(
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(
+                            phys_to_virt(paddr).as_ptr(),
                             phys_to_virt(new_frame).as_mut_ptr(),
                             page_size.into(),
                         )
                     };
-                    let old_slice = unsafe {
-                        core::slice::from_raw_parts(phys_to_virt(paddr).as_ptr(), page_size.into())
-                    };
 
-                    new_slice.copy_from_slice(old_slice);
                     dealloc_frame(paddr);
 
                     self.pt
