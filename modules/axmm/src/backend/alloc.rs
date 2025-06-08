@@ -43,6 +43,7 @@ impl Backend {
             // allocate all possible physical frames for populated mapping.
             for addr in PageIter4K::new(start, start + size).unwrap() {
                 if let Some(frame) = alloc_frame(true) {
+                    assert!(frame != PhysAddr::from(0xd1851028c48000));
                     if let Ok(tlb) = pt.map(addr, frame, PageSize::Size4K, flags) {
                         tlb.ignore(); // TLB flush on map is unnecessary, as there are no outdated mappings.
                     } else {
@@ -72,7 +73,9 @@ impl Backend {
                 }
                 tlb.flush();
                 dealloc_frame(frame);
+                error!("success unmap {:#x}", addr);
             } else {
+                error!("failed unmap {:#x}", addr);
                 // Deallocation is needn't if the page is not mapped.
             }
         }
