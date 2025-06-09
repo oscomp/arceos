@@ -84,6 +84,5 @@ impl FrameInfo {
 }
 
 fn phys_to_pfn(paddr: PhysAddr) -> usize {
-    assert!(paddr.as_usize() >= axconfig::plat::PHYS_MEMORY_BASE);
     (paddr.as_usize() - axconfig::plat::PHYS_MEMORY_BASE) >> FRAME_SHIFT
 }
