@@ -1,7 +1,5 @@
 //! Memory mapping backends.
 
-use ::alloc::sync::Arc;
-use alloc::FrameTracker;
 use axhal::paging::{MappingFlags, PageTable};
 use memory_addr::VirtAddr;
 use memory_set::MappingBackend;
@@ -9,7 +7,7 @@ use memory_set::MappingBackend;
 mod alloc;
 mod linear;
 
-pub use alloc::alloc_frame;
+pub use alloc::{alloc_frame, dealloc_frame};
 
 /// A unified enum type for different memory mapping backends.
 ///
@@ -19,6 +17,7 @@ pub use alloc::alloc_frame;
 ///   contiguous and their addresses should be known when creating the mapping.
 /// - **Allocation**: used in general, or for lazy mappings. The target physical
 ///   frames are obtained from the global allocator.
+#[derive(Clone)]
 pub enum Backend {
     /// Linear mapping backend.
     ///
@@ -38,9 +37,6 @@ pub enum Backend {
     Alloc {
         /// Whether to populate the physical frames when creating the mapping.
         populate: bool,
-        /// Track of the mapped physical frames.
-        /// The physical frame is wrapped through `Arc` and is released when there is no reference.
-        tracker: Arc<FrameTracker>,
     },
 }
 
@@ -49,22 +45,16 @@ impl MappingBackend for Backend {
     type Flags = MappingFlags;
     type PageTable = PageTable;
     fn map(&self, start: VirtAddr, size: usize, flags: MappingFlags, pt: &mut PageTable) -> bool {
-        match self {
-            Self::Linear { pa_va_offset } => {
-                Self::map_linear(start, size, flags, pt, *pa_va_offset)
-            }
-            Self::Alloc { populate, tracker } => {
-                Self::map_alloc(start, size, flags, pt, *populate, tracker.clone())
-            }
+        match *self {
+            Self::Linear { pa_va_offset } => Self::map_linear(start, size, flags, pt, pa_va_offset),
+            Self::Alloc { populate } => Self::map_alloc(start, size, flags, pt, populate),
         }
     }
 
     fn unmap(&self, start: VirtAddr, size: usize, pt: &mut PageTable) -> bool {
-        match self {
-            Self::Linear { pa_va_offset } => Self::unmap_linear(start, size, pt, *pa_va_offset),
-            Self::Alloc { populate, tracker } => {
-                Self::unmap_alloc(start, size, pt, *populate, tracker.clone())
-            }
+        match *self {
+            Self::Linear { pa_va_offset } => Self::unmap_linear(start, size, pt, pa_va_offset),
+            Self::Alloc { populate } => Self::unmap_alloc(start, size, pt, populate),
         }
     }
 
@@ -82,32 +72,6 @@ impl MappingBackend for Backend {
     }
 }
 
-impl Clone for Backend {
-    /// The `Backend` enum implements the `Clone` trait to properly duplicate its internal state
-    /// when cloning the backend.
-    ///
-    /// For the `Alloc` variant, create a new allocator backend, clone its `tracker`,
-    /// and insert every `frame` from the original `tracker` into the new `tracker`.
-    fn clone(&self) -> Self {
-        match self {
-            Backend::Alloc { populate, tracker } => {
-                let backend = Self::new_alloc(*populate);
-                let new_tracker = match &backend {
-                    Backend::Alloc { tracker, .. } => tracker.clone(),
-                    _ => unreachable!(),
-                };
-
-                tracker.for_each(|frame| {
-                    new_tracker.insert(frame.clone());
-                });
-
-                backend
-            }
-            Backend::Linear { pa_va_offset } => Self::new_linear(*pa_va_offset),
-        }
-    }
-}
-
 impl Backend {
     pub(crate) fn handle_page_fault(
         &self,
@@ -115,15 +79,11 @@ impl Backend {
         orig_flags: MappingFlags,
         page_table: &mut PageTable,
     ) -> bool {
-        match self {
+        match *self {
             Self::Linear { .. } => false, // Linear mappings should not trigger page faults.
-            Self::Alloc { populate, tracker } => Self::handle_page_fault_alloc(
-                vaddr,
-                orig_flags,
-                page_table,
-                *populate,
-                tracker.clone(),
-            ),
+            Self::Alloc { populate } => {
+                Self::handle_page_fault_alloc(vaddr, orig_flags, page_table, populate)
+            }
         }
     }
 }
