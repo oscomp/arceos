@@ -1,4 +1,5 @@
 use core::fmt;
+
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError, PageSize};
@@ -202,7 +203,7 @@ impl AddrSpace {
                 }
             },
             _ => {
-                panic!("FORCE MAP PAGE FAILED(NO AREA): {:#x} => {:#x}!", vaddr, paddr);
+                panic!("FORCE MAP PAGE FAILED(NOT FOUND AREA): {:#x} => {:#x}!", vaddr, paddr);
             },
         };
     }
@@ -220,7 +221,7 @@ impl AddrSpace {
                     .map(|_| true)
                     .unwrap_or_else(|_| panic!("FORCE FORCE PAGE FAILED(PAGE TABLE FAILEDA): {:#x}!", vaddr));
             },
-            _ => panic!("FORCE UNMAP PAGE FAILED(NO AREA): {:#x}!", vaddr),
+            _ => panic!("FORCE UNMAP PAGE FAILED(NOT FOUND AREA): {:#x}!", vaddr),
         };
     }
 

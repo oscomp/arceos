@@ -168,10 +168,11 @@ impl File {
     }
 
     fn _open_at(dir: Option<&VfsNodeRef>, path: &str, opts: &OpenOptions) -> AxResult<Self> {
+        debug!("open file: {} {:?}", path, opts);
         if !opts.is_valid() {
             return ax_err!(InvalidInput);
         }
-        
+
         let node_option = crate::root::lookup(dir, path);
         let node = if opts.create || opts.create_new {
             match node_option {
@@ -183,16 +184,14 @@ impl File {
                     node
                 }
                 // not exists, create new
-                Err(VfsError::NotFound) => {
-                    crate::root::create_file(dir, path)?
-                },
+                Err(VfsError::NotFound) => crate::root::create_file(dir, path)?,
                 Err(e) => return Err(e),
             }
         } else {
             // just open the existing
             node_option?
         };
-        
+
         let attr = node.get_attr()?;
         if attr.is_dir() {
             return ax_err!(IsADirectory);
@@ -201,7 +200,7 @@ impl File {
         if !perm_to_cap(attr.perm()).contains(access_cap) {
             return ax_err!(PermissionDenied);
         }
-        
+
         node.open()?;
         if opts.truncate {
             node.truncate(0)?;
@@ -212,6 +211,7 @@ impl File {
             offset: 0,
         })
     }
+
 
     /// Opens a file at the path relative to the current directory. Returns a
     /// [`File`] object.
