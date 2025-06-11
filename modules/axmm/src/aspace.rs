@@ -210,11 +210,6 @@ impl AddrSpace {
 
 
     pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
-        // panic!("");
-        // assert!(
-        //     vaddr.as_usize() < PHYS_VIRT_OFFSET,
-        //     "Force unmap addr is invalid, check if the virtual address is in kernel space"
-        // );
         match self.areas.find(vaddr) {
             Some(_) => {
                 self.pt.unmap(vaddr)
