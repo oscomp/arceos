@@ -163,28 +163,71 @@ impl AddrSpace {
         Ok(())
     }
 
-    /// Populates the area with physical frames, returning false if the area
-    /// contains unmapped area.
-    pub fn populate_area(&mut self, mut start: VirtAddr, size: usize) -> AxResult {
+    /// Ensures that the specified virtual memory region is fully mapped.
+    ///
+    /// This function walks through the given virtual address range and attempts to ensure
+    /// that every page is mapped. If a page is not mapped and the corresponding area allows
+    /// on-demand population (`populate == false`), it will trigger a page fault to map it.
+    /// If `cow_on_write` is true, it will handle copy-on-write (COW) logic for already
+    /// mapped pages that may require COW due to write intentions.
+    ///
+    /// # Parameters
+    ///
+    /// - `start`: The starting virtual address of the region to map.
+    /// - `size`: The size (in bytes) of the region.
+    /// - `cow_on_write`: Whether to trigger copy-on-write handling for write-intended mappings.
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(())` if the entire region is successfully mapped, or an appropriate
+    /// `AxError` variant (`NoMemory`, `BadAddress`) on failure.
+    ///
+    /// # Errors
+    ///
+    /// - `AxError::NoMemory`: Failed to allocate.
+    /// - `AxError::BadAddress`: An invalid mapping state was detected.
+    pub fn ensure_region_mapped(
+        &mut self,
+        mut start: VirtAddr,
+        size: usize,
+        cow_on_write: bool,
+    ) -> AxResult {
         self.validate_region(start, size)?;
         let end = start + size;
 
         while let Some(area) = self.areas.find(start) {
             let backend = area.backend();
             if let Backend::Alloc { populate, .. } = backend {
-                if !*populate {
-                    for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
-                        match self.pt.query(addr) {
-                            Ok(_) => {}
-                            // If the page is not mapped, try map it.
-                            Err(PagingError::NotMapped) => {
+                for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
+                    match self.pt.query(addr) {
+                        // if the page is already mapped and write intentions, try cow.
+                        Ok((paddr, flags, page_size)) => {
+                            if cow_on_write {
+                                if !area.flags().contains(MappingFlags::WRITE) {
+                                    return Err(AxError::BadAddress)
+                                }
+
+                                if !Self::handle_cow_fault(
+                                    addr,
+                                    paddr,
+                                    flags,
+                                    page_size,
+                                    &mut self.pt,
+                                ) {
+                                    return Err(AxError::NoMemory);
+                                }
+                            }
+                        }
+                        // If the page is not mapped, try map it.
+                        Err(PagingError::NotMapped) => {
+                            if !*populate {
                                 if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
                                     return Err(AxError::NoMemory);
                                 }
                             }
-                            Err(_) => return Err(AxError::BadAddress),
-                        };
-                    }
+                        }
+                        Err(_) => return Err(AxError::BadAddress),
+                    };
                 }
             }
             start = area.end();
@@ -317,7 +360,7 @@ impl AddrSpace {
     /// aligned.
     pub fn protect(&mut self, start: VirtAddr, size: usize, flags: MappingFlags) -> AxResult {
         // Populate the area first, which also checks the address range for us.
-        self.populate_area(start, size)?;
+        self.ensure_region_mapped(start, size, false)?;
 
         self.areas
             .protect(start, size, |_| Some(flags), &mut self.pt)
@@ -386,7 +429,13 @@ impl AddrSpace {
                     // 1. page fault caused by write
                     // 2. pte exists
                     // 3. Not shared memory
-                    return self.handle_cow_fault(vaddr, paddr.sub(off), orig_flags, page_size);
+                    return Self::handle_cow_fault(
+                        vaddr,
+                        paddr.sub(off),
+                        orig_flags,
+                        page_size,
+                        &mut self.pt,
+                    );
                 } else {
                     return area
                         .backend()
@@ -516,27 +565,24 @@ impl AddrSpace {
     /// it must be the starting physical address.
     /// - `flags`: vma flags.
     /// - `page_size`: The size of the page on which the current physical address is located
+    /// - `pt`: A mutable reference to the page table that should be updated.
     ///
     /// # Returns
     /// - `true` if the page fault was handled successfully.
     /// - `false` if the fault handling failed (e.g., allocation failed or invalid ref count).
     fn handle_cow_fault(
-        &mut self,
         vaddr: VirtAddr,
         paddr: PhysAddr,
         flags: MappingFlags,
         page_size: PageSize,
+        pt: &mut PageTable,
     ) -> bool {
         let frame_info = get_frame_info(paddr);
         match frame_info.ref_count() {
             0 => unreachable!(),
             // There is only one AddrSpace reference to the page,
             // so there is no need to copy it.
-            1 => self
-                .pt
-                .protect(vaddr, flags)
-                .map(|(_, tlb)| tlb.flush())
-                .is_ok(),
+            1 => pt.protect(vaddr, flags).map(|(_, tlb)| tlb.flush()).is_ok(),
             // Allocates the new page and copies the contents of the original page,
             // remapping the virtual address to the physical address of the new page.
             2.. => match alloc_frame(false, page_size.into()) {
@@ -551,8 +597,7 @@ impl AddrSpace {
 
                     dealloc_frame(paddr);
 
-                    self.pt
-                        .remap(vaddr, new_frame, flags)
+                    pt.remap(vaddr, new_frame, flags)
                         .map(|(_, tlb)| {
                             tlb.flush();
                         })
