@@ -1,5 +1,4 @@
-use core::{error, fmt};
-
+use core::fmt;
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError, PageSize};
@@ -8,8 +7,6 @@ use memory_addr::{
 };
 use memory_set::{MemoryArea, MemorySet};
 use axhal::arch::flush_tlb;
-
-use axconfig::plat::PHYS_VIRT_OFFSET;
 use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
 
@@ -190,41 +187,29 @@ impl AddrSpace {
         paddr: PhysAddr, 
         access_flags: MappingFlags
     ) -> bool {
-        match self.pt.query(VirtAddr::from(0x2000)) {
-            Ok((oldpaddr, _, _)) => assert!(oldpaddr != PhysAddr::from_usize(0xd1851028c48000)),
-            _ => (),
-        };
-        
         match self.areas.find(vaddr) {
             Some(area) => {
                 if !area.flags().contains(access_flags) {
                     panic!("FORCE MAP PAGE FAILED(ACCESS MOD): {:#x} => {:#x}!", vaddr, paddr);
-                    return false;
                 }
                 match self.pt.map(vaddr, paddr, PageSize::Size4K, area.flags()) {
                     Ok(_) => {
-                        match self.pt.query(VirtAddr::from(0x2000)) {
-                            Ok((oldpaddr, _, _)) => assert!(oldpaddr != PhysAddr::from_usize(0xd1851028c48000)),
-                            _ => (),
-                        };
                         return true;
                     },
                     Err(e) => {
                         panic!("FORCE MAP PAGE FAILED(PAGE TABLE FAILED {:?}): {:#x} => {:#x}", e, vaddr, paddr);
-                        return false;
                     }
                 }
             },
             _ => {
                 panic!("FORCE MAP PAGE FAILED(NO AREA): {:#x} => {:#x}!", vaddr, paddr);
-                return false;
             },
         };
     }
 
 
     pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
-        // panic!("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaassssssssssssssssssssssssssssssssssss");
+        // panic!("");
         // assert!(
         //     vaddr.as_usize() < PHYS_VIRT_OFFSET,
         //     "Force unmap addr is invalid, check if the virtual address is in kernel space"

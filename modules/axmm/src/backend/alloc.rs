@@ -73,9 +73,9 @@ impl Backend {
                 }
                 tlb.flush();
                 dealloc_frame(frame);
-                error!("success unmap {:#x}", addr);
+                // error!("success unmap {:#x}", addr);
             } else {
-                error!("failed unmap {:#x}", addr);
+                // error!("failed unmap {:#x}", addr);
                 // Deallocation is needn't if the page is not mapped.
             }
         }

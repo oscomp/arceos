@@ -24,7 +24,6 @@ pub type FilePerm = axfs_vfs::VfsNodePerm;
 pub struct File {
     node: WithCap<VfsNodeRef>,
     is_append: bool,
-    is_direct: bool,
     offset: u64,
 }
 
@@ -114,6 +113,10 @@ impl OpenOptions {
         self.directory
     }
 
+    pub fn has_direct(&self) -> bool {
+        self.direct
+    }
+
     /// Sets the create flags.
     pub fn set_create(mut self, create: bool, create_new: bool) -> Self {
         self.create = create;
@@ -130,6 +133,11 @@ impl OpenOptions {
     /// Sets the write flag.
     pub fn set_write(mut self, write: bool) -> Self {
         self.write = write;
+        self
+    }
+
+    pub fn set_direct(mut self, direct: bool) -> Self {
+        self.direct = direct;
         self
     }
 
@@ -163,7 +171,7 @@ impl File {
         if !opts.is_valid() {
             return ax_err!(InvalidInput);
         }
-
+        
         let node_option = crate::root::lookup(dir, path);
         let node = if opts.create || opts.create_new {
             match node_option {
@@ -175,14 +183,16 @@ impl File {
                     node
                 }
                 // not exists, create new
-                Err(VfsError::NotFound) => crate::root::create_file(dir, path)?,
+                Err(VfsError::NotFound) => {
+                    crate::root::create_file(dir, path)?
+                },
                 Err(e) => return Err(e),
             }
         } else {
             // just open the existing
             node_option?
         };
-
+        
         let attr = node.get_attr()?;
         if attr.is_dir() {
             return ax_err!(IsADirectory);
@@ -191,7 +201,7 @@ impl File {
         if !perm_to_cap(attr.perm()).contains(access_cap) {
             return ax_err!(PermissionDenied);
         }
-
+        
         node.open()?;
         if opts.truncate {
             node.truncate(0)?;
@@ -199,7 +209,6 @@ impl File {
         Ok(Self {
             node: WithCap::new(node, access_cap),
             is_append: opts.append,
-            is_direct: opts.direct,
             offset: 0,
         })
     }
@@ -286,16 +295,6 @@ impl File {
     /// Gets the file attributes.
     pub fn get_attr(&self) -> AxResult<FileAttr> {
         self.access_node(Cap::empty())?.get_attr()
-    }
-
-    /// Gets the file offset
-    pub fn get_offset(&self) -> u64 {
-        self.offset
-    }
-
-    /// Check whether direct or not
-    pub fn is_direct(&self) -> bool {
-        self.is_direct
     }
 }
 
