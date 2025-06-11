@@ -7,9 +7,12 @@
 //! that keeps track of its reference count.
 //! NOTE: If the page is huge page, its [`FrameInfo`] is placed at the
 //! starting physical address.
-use core::sync::atomic::{AtomicUsize, Ordering};
+use core::{
+    array,
+    sync::atomic::{AtomicUsize, Ordering},
+};
 
-use alloc::vec::Vec;
+use alloc::boxed::Box;
 use lazyinit::LazyInit;
 use memory_addr::PhysAddr;
 
@@ -18,11 +21,10 @@ const FRAME_SHIFT: usize = 12;
 
 pub const MAX_FRAME_NUM: usize = axconfig::plat::PHYS_MEMORY_SIZE >> FRAME_SHIFT;
 
-static FRAME_INFO_TABLE: LazyInit<Vec<FrameInfo>> = LazyInit::new();
+static FRAME_INFO_TABLE: LazyInit<Box<[FrameInfo; MAX_FRAME_NUM]>> = LazyInit::new();
 
-pub fn init_frame_info_table() {
-    let _ =
-        FRAME_INFO_TABLE.init_once((0..MAX_FRAME_NUM).map(|_| FrameInfo::new_empty()).collect());
+pub fn init_frames() {
+    let _ = FRAME_INFO_TABLE.init_once(Box::new(array::from_fn(|_| FrameInfo::new_empty())));
 }
 
 /// Returns the `FrameInfo` structure associated with a given physical address.
@@ -43,8 +45,7 @@ pub fn get_frame_info(paddr: PhysAddr) -> &'static FrameInfo {
 /// - `paddr`: It must be an aligned physical address; if it's a huge page,
 /// it must be the starting physical address.
 pub fn add_frame_ref(paddr: PhysAddr) {
-    let frame = get_frame_info(paddr);
-    frame.inc_ref();
+    get_frame_info(paddr).inc_ref();
 }
 
 /// Decreases the reference count of the frame associated with a physical address.
@@ -55,8 +56,7 @@ pub fn add_frame_ref(paddr: PhysAddr) {
 /// # Returns
 /// The updated reference count after decrementing.
 pub fn dec_frame_ref(paddr: PhysAddr) -> usize {
-    let frame = get_frame_info(paddr);
-    frame.dec_ref()
+    get_frame_info(paddr).dec_ref()
 }
 
 pub struct FrameInfo {

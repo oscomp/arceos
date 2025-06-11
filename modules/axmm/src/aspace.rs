@@ -204,7 +204,7 @@ impl AddrSpace {
                         Ok((paddr, flags, page_size)) => {
                             if cow_on_write {
                                 if !area.flags().contains(MappingFlags::WRITE) {
-                                    return Err(AxError::BadAddress)
+                                    return Err(AxError::BadAddress);
                                 }
 
                                 if !Self::handle_cow_fault(
@@ -530,6 +530,7 @@ impl AddrSpace {
 
             let mut flags = area.flags();
             flags.remove(MappingFlags::WRITE);
+
             //If the page is mapped in the old page table:
             // - Update its permissions in the old page table using `flags`.
             // - Map the same physical page into the new page table at the same
@@ -585,7 +586,7 @@ impl AddrSpace {
             1 => pt.protect(vaddr, flags).map(|(_, tlb)| tlb.flush()).is_ok(),
             // Allocates the new page and copies the contents of the original page,
             // remapping the virtual address to the physical address of the new page.
-            2.. => match alloc_frame(false, page_size.into()) {
+            2.. => match alloc_frame(false) {
                 Some(new_frame) => {
                     unsafe {
                         core::ptr::copy_nonoverlapping(

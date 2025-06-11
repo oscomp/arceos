@@ -15,7 +15,6 @@ pub use self::backend::Backend;
 
 use axerrno::{AxError, AxResult};
 use axhal::mem::phys_to_virt;
-use frameinfo::init_frame_info_table;
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::{PhysAddr, va};
@@ -66,7 +65,7 @@ pub fn init_memory_management() {
     KERNEL_ASPACE.init_once(SpinNoIrq::new(kernel_aspace));
     axhal::paging::set_kernel_page_table_root(kernel_page_table_root());
 
-    init_frame_info_table();
+    frameinfo::init_frames();
 }
 
 /// Initializes kernel paging for secondary CPUs.

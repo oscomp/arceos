@@ -13,14 +13,13 @@ use super::Backend;
 ///
 /// # Parameters
 /// - `zeroed`: If `true`, the allocated frame memory is zeroed out.
-/// - `align`: The alignment requirement (in pages) for the allocation.
 ///
 /// # Returns
 /// Returns `Some(PhysAddr)` of the allocated frame on success, or `None` if allocation fails.
-pub fn alloc_frame(zeroed: bool, align: usize) -> Option<PhysAddr> {
-    let vaddr = VirtAddr::from(global_allocator().alloc_pages(1, align).ok()?);
+pub fn alloc_frame(zeroed: bool) -> Option<PhysAddr> {
+    let vaddr = VirtAddr::from(global_allocator().alloc_pages(1, PAGE_SIZE_4K).ok()?);
     if zeroed {
-        unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, align) };
+        unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, PAGE_SIZE_4K) };
     }
     let paddr = virt_to_phys(vaddr);
     add_frame_ref(paddr);
@@ -66,7 +65,7 @@ impl Backend {
         if populate {
             // allocate all possible physical frames for populated mapping.
             for addr in PageIter4K::new(start, start + size).unwrap() {
-                if let Some(frame) = alloc_frame(true, PAGE_SIZE_4K) {
+                if let Some(frame) = alloc_frame(true) {
                     if let Ok(tlb) = pt.map(addr, frame, PageSize::Size4K, flags) {
                         tlb.ignore(); // TLB flush on map is unnecessary, as there are no outdated mappings.
                     } else {
@@ -112,7 +111,7 @@ impl Backend {
     ) -> bool {
         if populate {
             false // Populated mappings should not trigger page faults.
-        } else if let Some(frame) = alloc_frame(true, PAGE_SIZE_4K) {
+        } else if let Some(frame) = alloc_frame(true) {
             // Allocate a physical frame lazily and map it to the fault address.
             // `vaddr` does not need to be aligned. It will be automatically
             // aligned during `pt.map` regardless of the page size.
