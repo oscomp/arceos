@@ -212,7 +212,6 @@ impl File {
         })
     }
 
-
     /// Opens a file at the path relative to the current directory. Returns a
     /// [`File`] object.
     pub fn open(path: &str, opts: &OpenOptions) -> AxResult<Self> {
