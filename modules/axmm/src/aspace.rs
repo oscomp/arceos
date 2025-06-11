@@ -282,9 +282,9 @@ impl AddrSpace {
                 } => align,
             };
 
-            let area_start = start.max(area.start());
-            let area_size = end.min(area.end()) - area_start;
-            if !area_start.is_aligned(area_align) || !is_aligned(area_size, area_align.into()) {
+            let unmap_start = start.max(area.start());
+            let unmap_size = end.min(area.end()) - unmap_start;
+            if !unmap_start.is_aligned(area_align) || !is_aligned(unmap_size, area_align.into()) {
                 return ax_err!(InvalidInput, "address not aligned");
             }
         }
