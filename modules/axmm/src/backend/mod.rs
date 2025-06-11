@@ -81,7 +81,7 @@ impl Backend {
             Self::Linear { .. } => false, // Linear mappings should not trigger page faults.
             Self::Alloc { populate } => {
                 Self::handle_page_fault_alloc(vaddr, orig_flags, page_table, populate)
-            },
+            }
         }
     }
 }

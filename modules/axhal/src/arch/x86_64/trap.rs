@@ -36,7 +36,6 @@ fn x86_trap_handler(tf: &mut TrapFrame) {
     if !matches!(tf.vector as u8, IRQ_VECTOR_START..=IRQ_VECTOR_END) {
         unmask_irqs(tf);
     }
-    error!("{:#x?}", tf);
     match tf.vector as u8 {
         PAGE_FAULT_VECTOR => handle_page_fault(tf),
         BREAKPOINT_VECTOR => debug!("#BP @ {:#x} ", tf.rip),
