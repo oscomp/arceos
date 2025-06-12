@@ -134,36 +134,7 @@ impl AddrSpace {
         limit: VirtAddrRange,
         align: PageSize,
     ) -> Option<VirtAddr> {
-        let mut last_end = hint.max(limit.start).align_up(align);
-        for area in self.areas.iter() {
-            if area.end() <= last_end {
-                last_end = last_end.max(area.end().align_up(align));
-            } else {
-                break;
-            }
-        }
-        for area in self.areas.iter() {
-            let area_start = area.start();
-            if area_start < last_end {
-                continue;
-            }
-            if last_end
-                .checked_add(size)
-                .is_some_and(|end| end <= area_start)
-            {
-                return Some(last_end);
-            }
-            last_end = area.end().align_up(align);
-        }
-
-        if last_end
-            .checked_add(size)
-            .is_some_and(|end| end <= limit.end)
-        {
-            Some(last_end)
-        } else {
-            None
-        }
+        self.areas.find_free_area(hint, size, limit, align.into())
     }
 
     /// Add a new linear mapping.
