@@ -612,16 +612,20 @@ impl AddrSpace {
             let mut flags = area.flags();
             flags.remove(MappingFlags::WRITE);
 
+            let align = if let Backend::Alloc { align, .. } = backend {
+                align
+            } else {
+                unreachable!()
+            };
+
             //If the page is mapped in the old page table:
             // - Update its permissions in the old page table using `flags`.
             // - Map the same physical page into the new page table at the same
             // virtual address, with the same page size and `flags`.
-            // TODO: huge page iter
-            for vaddr in
-                PageIter4K::new(area.start(), area.end()).expect("Failed to create page iterator")
+            for vaddr in PageIterWrapper::new(area.start(), area.end(), align)
+                .expect("Failed to create page iterator")
             {
                 if let Ok((paddr, _, page_size)) = old_pt.query(vaddr) {
-                    // FIXME: need use huge page iter
                     add_frame_ref(paddr);
 
                     old_pt
