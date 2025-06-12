@@ -3,9 +3,12 @@
 use axhal::paging::{MappingFlags, PageTable};
 use memory_addr::VirtAddr;
 use memory_set::MappingBackend;
+pub use page_iter_wrapper::PageIterWrapper;
+use page_table_multiarch::PageSize;
 
 mod alloc;
 mod linear;
+mod page_iter_wrapper;
 
 /// A unified enum type for different memory mapping backends.
 ///
@@ -25,6 +28,8 @@ pub enum Backend {
     Linear {
         /// `vaddr - paddr`.
         pa_va_offset: usize,
+        /// Alignment parameters for the starting address and memory range.
+        align: PageSize,
     },
     /// Allocation mapping backend.
     ///
@@ -35,6 +40,8 @@ pub enum Backend {
     Alloc {
         /// Whether to populate the physical frames when creating the mapping.
         populate: bool,
+        /// Alignment parameters for the starting address and memory range.
+        align: PageSize,
     },
 }
 
@@ -44,15 +51,23 @@ impl MappingBackend for Backend {
     type PageTable = PageTable;
     fn map(&self, start: VirtAddr, size: usize, flags: MappingFlags, pt: &mut PageTable) -> bool {
         match *self {
-            Self::Linear { pa_va_offset } => Self::map_linear(start, size, flags, pt, pa_va_offset),
-            Self::Alloc { populate } => Self::map_alloc(start, size, flags, pt, populate),
+            Self::Linear {
+                pa_va_offset,
+                align: _,
+            } => Self::map_linear(start, size, flags, pt, pa_va_offset),
+            Self::Alloc { populate, align } => {
+                Self::map_alloc(start, size, flags, pt, populate, align)
+            }
         }
     }
 
     fn unmap(&self, start: VirtAddr, size: usize, pt: &mut PageTable) -> bool {
         match *self {
-            Self::Linear { pa_va_offset } => Self::unmap_linear(start, size, pt, pa_va_offset),
-            Self::Alloc { populate } => Self::unmap_alloc(start, size, pt, populate),
+            Self::Linear {
+                pa_va_offset,
+                align: _,
+            } => Self::unmap_linear(start, size, pt, pa_va_offset),
+            Self::Alloc { populate, align } => Self::unmap_alloc(start, size, pt, populate, align),
         }
     }
 
@@ -79,8 +94,8 @@ impl Backend {
     ) -> bool {
         match *self {
             Self::Linear { .. } => false, // Linear mappings should not trigger page faults.
-            Self::Alloc { populate } => {
-                Self::handle_page_fault_alloc(vaddr, orig_flags, page_table, populate)
+            Self::Alloc { populate, align } => {
+                Self::handle_page_fault_alloc(vaddr, orig_flags, page_table, populate, align)
             }
         }
     }

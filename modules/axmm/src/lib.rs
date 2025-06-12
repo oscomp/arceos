@@ -19,6 +19,7 @@ use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::{MemoryAddr, PhysAddr, va};
 use memory_set::MappingError;
+use page_table_multiarch::PageSize;
 
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
 
@@ -66,6 +67,7 @@ pub fn new_kernel_aspace() -> AxResult<AddrSpace> {
             start,
             end - start,
             reg_flag_to_map_flag(r.flags),
+            PageSize::Size4K,
         )?;
     }
     Ok(aspace)

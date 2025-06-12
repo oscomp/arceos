@@ -24,4 +24,4 @@ lazyinit = "0.2"
 memory_addr = "0.4"
 kspin = "0.1"
 memory_set = "0.4"
-page_table_multiarch = { version = "0.5.5", optional = true }
+page_table_multiarch = "0.5.5"
