@@ -4,12 +4,12 @@ use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageTable, PagingError};
 use memory_addr::{
-    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
+    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned,
 };
 use memory_set::{MemoryArea, MemorySet};
 use page_table_multiarch::PageSize;
 
-use crate::backend::{Backend, alloc_frame, dealloc_frame};
+use crate::backend::{Backend, PageIterWrapper, alloc_frame, dealloc_frame};
 use crate::frameinfo::{add_frame_ref, get_frame_info};
 use crate::mapping_err_to_ax_err;
 
@@ -87,28 +87,84 @@ impl AddrSpace {
         self.pt.clear_copy_range(range.start, range.size());
     }
 
-    fn validate_region(&self, start: VirtAddr, size: usize) -> AxResult {
+    /// The page table hardware can only map address ranges that are page-aligned.
+    /// During the memory region validation in AddrSpace,
+    /// the system enforces address alignment,
+    /// ensuring that all memory operations comply with page boundary requirements.
+    fn validate_region(&self, start: VirtAddr, size: usize, align: PageSize) -> AxResult {
         if !self.contains_range(start, size) {
             return ax_err!(InvalidInput, "address out of range");
         }
-        if !start.is_aligned_4k() || !is_aligned_4k(size) {
+        if !start.is_aligned(align) || !is_aligned(size, align.into()) {
             return ax_err!(InvalidInput, "address not aligned");
         }
         Ok(())
     }
 
-    /// Finds a free area that can accommodate the given size.
+    /// Searches for a contiguous free region in the virtual address space
     ///
-    /// The search starts from the given hint address, and the area should be within the given limit range.
+    /// This function searches for available virtual address space within a specified address range,
+    /// based on the current memory region layout, that satisfies the size and alignment requirements.
     ///
-    /// Returns the start address of the free area. Returns None if no such area is found.
+    /// # Parameters
+    /// - `hint`: Suggested starting address for the search (may be adjusted due to alignment or overlapping regions)
+    /// - `size`: Size of the contiguous address space to allocate (in bytes)
+    /// - `limit`: Boundary of the allowed address range (inclusive of start and end addresses)
+    /// - `align`: Address alignment requirement (e.g., page alignment like 4KB/2MB)
+    ///
+    /// # Return Value
+    /// - `Some(VirtAddr)`: A starting virtual address that meets all requirements was found
+    /// - `None`: No sufficient space was found within the specified range
+    ///
+    /// # Implementation Logic
+    /// 1. Initialize `last_end` to the maximum aligned value between the hint and the start of the limit range
+    /// 2. First pass: handle regions before the hint to determine the initial search position
+    /// 3. Second pass: check gaps between regions:
+    ///    - Skip overlapping and already occupied regions
+    ///    - Check whether the gap between regions satisfies the `size + alignment` requirement
+    /// 4. Finally, verify that the found address is within the specified `limit` range
+    ///
+    /// # Notes
+    /// - Alignment is strictly enforced on candidate addresses (ensured via `align_up`)
+    /// - The region must be fully contained within the `limit` range (`end <= limit.end`)
+    /// - The search may ignore the `hint` if a better space is found in later regions
     pub fn find_free_area(
         &self,
         hint: VirtAddr,
         size: usize,
         limit: VirtAddrRange,
+        align: PageSize,
     ) -> Option<VirtAddr> {
-        self.areas.find_free_area(hint, size, limit)
+        let mut last_end = hint.max(limit.start).align_up(align);
+        for area in self.areas.iter() {
+            if area.end() <= last_end {
+                last_end = last_end.max(area.end().align_up(align));
+            } else {
+                break;
+            }
+        }
+        for area in self.areas.iter() {
+            let area_start = area.start();
+            if area_start < last_end {
+                continue;
+            }
+            if last_end
+                .checked_add(size)
+                .is_some_and(|end| end <= area_start)
+            {
+                return Some(last_end);
+            }
+            last_end = area.end().align_up(align);
+        }
+
+        if last_end
+            .checked_add(size)
+            .is_some_and(|end| end <= limit.end)
+        {
+            Some(last_end)
+        } else {
+            None
+        }
     }
 
     /// Add a new linear mapping.
@@ -125,14 +181,16 @@ impl AddrSpace {
         start_paddr: PhysAddr,
         size: usize,
         flags: MappingFlags,
+        align: PageSize,
     ) -> AxResult {
-        self.validate_region(start_vaddr, size)?;
-        if !start_paddr.is_aligned_4k() {
+        self.validate_region(start_vaddr, size, align)?;
+
+        if !start_paddr.is_aligned(align) {
             return ax_err!(InvalidInput, "address not aligned");
         }
 
         let offset = start_vaddr.as_usize() - start_paddr.as_usize();
-        let area = MemoryArea::new(start_vaddr, size, flags, Backend::new_linear(offset));
+        let area = MemoryArea::new(start_vaddr, size, flags, Backend::new_linear(offset, align));
         self.areas
             .map(area, &mut self.pt, false)
             .map_err(mapping_err_to_ax_err)?;
@@ -153,10 +211,11 @@ impl AddrSpace {
         size: usize,
         flags: MappingFlags,
         populate: bool,
+        align: PageSize,
     ) -> AxResult {
-        self.validate_region(start, size)?;
+        self.validate_region(start, size, align)?;
 
-        let area = MemoryArea::new(start, size, flags, Backend::new_alloc(populate));
+        let area = MemoryArea::new(start, size, flags, Backend::new_alloc(populate, align));
         self.areas
             .map(area, &mut self.pt, false)
             .map_err(mapping_err_to_ax_err)?;
@@ -175,6 +234,7 @@ impl AddrSpace {
     ///
     /// - `start`: The starting virtual address of the region to map.
     /// - `size`: The size (in bytes) of the region.
+    /// - `align`: Alignment requirement for the allocated memory, must be a multiple of 4KiB.
     /// - `cow_on_write`: Whether to trigger copy-on-write handling for write-intended mappings.
     ///
     /// # Returns
@@ -190,15 +250,16 @@ impl AddrSpace {
         &mut self,
         mut start: VirtAddr,
         size: usize,
+        align: PageSize,
         cow_on_write: bool,
     ) -> AxResult {
-        self.validate_region(start, size)?;
+        self.validate_region(start, size, align)?;
         let end = start + size;
 
         while let Some(area) = self.areas.find(start) {
             let backend = area.backend();
-            if let Backend::Alloc { populate, .. } = backend {
-                for addr in PageIter4K::new(start, area.end().min(end)).unwrap() {
+            if let Backend::Alloc { populate, align } = *backend {
+                for addr in PageIterWrapper::new(start, area.end().min(end), align).unwrap() {
                     match self.pt.query(addr) {
                         // if the page is already mapped and write intentions, try cow.
                         Ok((paddr, flags, page_size)) => {
@@ -220,7 +281,7 @@ impl AddrSpace {
                         }
                         // If the page is not mapped, try map it.
                         Err(PagingError::NotMapped) => {
-                            if !*populate {
+                            if !populate {
                                 if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
                                     return Err(AxError::NoMemory);
                                 }
@@ -231,7 +292,7 @@ impl AddrSpace {
                 }
             }
             start = area.end();
-            assert!(start.is_aligned_4k());
+            assert!(start.is_aligned(align));
             if start >= end {
                 break;
             }
@@ -250,7 +311,29 @@ impl AddrSpace {
     /// Returns an error if the address range is out of the address space or not
     /// aligned.
     pub fn unmap(&mut self, start: VirtAddr, size: usize) -> AxResult {
-        self.validate_region(start, size)?;
+        self.validate_region(start, size, PageSize::Size4K)?;
+
+        let end = start + size;
+        for area in self
+            .areas
+            .iter()
+            .skip_while(move |a| a.end() <= start)
+            .take_while(move |a| a.start() < end)
+        {
+            let area_align = match *area.backend() {
+                Backend::Alloc { populate: _, align } => align,
+                Backend::Linear {
+                    pa_va_offset: _,
+                    align,
+                } => align,
+            };
+
+            let unmap_start = start.max(area.start());
+            let unmap_size = end.min(area.end()) - unmap_start;
+            if !unmap_start.is_aligned(area_align) || !is_aligned(unmap_size, area_align.into()) {
+                return ax_err!(InvalidInput, "address not aligned");
+            }
+        }
 
         self.areas
             .unmap(start, size, &mut self.pt)
@@ -260,16 +343,6 @@ impl AddrSpace {
 
     /// To remove user area mappings from address space.
     pub fn unmap_user_areas(&mut self) -> AxResult {
-        for area in self.areas.iter() {
-            assert!(area.start().is_aligned_4k());
-            assert!(area.size() % PAGE_SIZE_4K == 0);
-            assert!(area.flags().contains(MappingFlags::USER));
-            assert!(
-                self.va_range
-                    .contains_range(VirtAddrRange::from_start_size(area.start(), area.size())),
-                "MemorySet contains out-of-va-range area"
-            );
-        }
         self.areas.clear(&mut self.pt).unwrap();
         Ok(())
     }
@@ -286,11 +359,11 @@ impl AddrSpace {
     ///
     /// # Notes
     ///   The caller must ensure that the permission of the operation is allowed.
-    fn process_area_data<F>(&self, start: VirtAddr, size: usize, f: F) -> AxResult
+    fn process_area_data<F>(&self, start: VirtAddr, size: usize, align: PageSize, f: F) -> AxResult
     where
         F: FnMut(VirtAddr, usize, usize),
     {
-        Self::process_area_data_with_page_table(&self.pt, &self.va_range, start, size, f)
+        Self::process_area_data_with_page_table(&self.pt, &self.va_range, start, size, align, f)
     }
 
     fn process_area_data_with_page_table<F>(
@@ -298,6 +371,7 @@ impl AddrSpace {
         va_range: &VirtAddrRange,
         start: VirtAddr,
         size: usize,
+        align: PageSize,
         mut f: F,
     ) -> AxResult
     where
@@ -308,8 +382,9 @@ impl AddrSpace {
         }
         let mut cnt = 0;
         // If start is aligned to 4K, start_align_down will be equal to start_align_up.
-        let end_align_up = (start + size).align_up_4k();
-        for vaddr in PageIter4K::new(start.align_down_4k(), end_align_up)
+        let end_align_up = (start + size).align_up(align);
+        let start_addr = start.align_down(align);
+        for vaddr in PageIterWrapper::new(start_addr, end_align_up, align)
             .expect("Failed to create page iterator")
         {
             let (mut paddr, _, _) = pt.query(vaddr).map_err(|_| AxError::BadAddress)?;
@@ -319,9 +394,9 @@ impl AddrSpace {
             if copy_size == 0 {
                 break;
             }
-            if vaddr == start.align_down_4k() && start.align_offset_4k() != 0 {
-                let align_offset = start.align_offset_4k();
-                copy_size = copy_size.min(PAGE_SIZE_4K - align_offset);
+            if vaddr == start.align_down(align) && start.align_offset(align) != 0 {
+                let align_offset = start.align_offset(align);
+                copy_size = copy_size.min(align as usize - align_offset);
                 paddr += align_offset;
             }
             f(phys_to_virt(paddr), cnt, copy_size);
@@ -336,8 +411,8 @@ impl AddrSpace {
     ///
     /// * `start` - The start virtual address to read.
     /// * `buf` - The buffer to store the data.
-    pub fn read(&self, start: VirtAddr, buf: &mut [u8]) -> AxResult {
-        self.process_area_data(start, buf.len(), |src, offset, read_size| unsafe {
+    pub fn read(&self, start: VirtAddr, align: PageSize, buf: &mut [u8]) -> AxResult {
+        self.process_area_data(start, buf.len(), align, |src, offset, read_size| unsafe {
             core::ptr::copy_nonoverlapping(src.as_ptr(), buf.as_mut_ptr().add(offset), read_size);
         })
     }
@@ -348,8 +423,8 @@ impl AddrSpace {
     ///
     /// * `start_vaddr` - The start virtual address to write.
     /// * `buf` - The buffer to write to the address space.
-    pub fn write(&self, start: VirtAddr, buf: &[u8]) -> AxResult {
-        self.process_area_data(start, buf.len(), |dst, offset, write_size| unsafe {
+    pub fn write(&self, start: VirtAddr, align: PageSize, buf: &[u8]) -> AxResult {
+        self.process_area_data(start, buf.len(), align, |dst, offset, write_size| unsafe {
             core::ptr::copy_nonoverlapping(buf.as_ptr().add(offset), dst.as_mut_ptr(), write_size);
         })
     }
@@ -358,9 +433,15 @@ impl AddrSpace {
     ///
     /// Returns an error if the address range is out of the address space or not
     /// aligned.
-    pub fn protect(&mut self, start: VirtAddr, size: usize, flags: MappingFlags) -> AxResult {
+    pub fn protect(
+        &mut self,
+        start: VirtAddr,
+        size: usize,
+        flags: MappingFlags,
+        align: PageSize,
+    ) -> AxResult {
         // Populate the area first, which also checks the address range for us.
-        self.ensure_region_mapped(start, size, false)?;
+        self.ensure_region_mapped(start, size, align, false)?;
 
         self.areas
             .protect(start, size, |_| Some(flags), &mut self.pt)
@@ -565,7 +646,7 @@ impl AddrSpace {
     /// - `paddr`: It must be an aligned physical address; if it's a huge page,
     /// it must be the starting physical address.
     /// - `flags`: vma flags.
-    /// - `page_size`: The size of the page on which the current physical address is located
+    /// - `align`: Alignment requirement for the allocated memory, must be a multiple of 4KiB.
     /// - `pt`: A mutable reference to the page table that should be updated.
     ///
     /// # Returns
@@ -575,7 +656,7 @@ impl AddrSpace {
         vaddr: VirtAddr,
         paddr: PhysAddr,
         flags: MappingFlags,
-        page_size: PageSize,
+        align: PageSize,
         pt: &mut PageTable,
     ) -> bool {
         let frame_info = get_frame_info(paddr);
@@ -586,17 +667,17 @@ impl AddrSpace {
             1 => pt.protect(vaddr, flags).map(|(_, tlb)| tlb.flush()).is_ok(),
             // Allocates the new page and copies the contents of the original page,
             // remapping the virtual address to the physical address of the new page.
-            2.. => match alloc_frame(false) {
+            2.. => match alloc_frame(false, align) {
                 Some(new_frame) => {
                     unsafe {
                         core::ptr::copy_nonoverlapping(
                             phys_to_virt(paddr).as_ptr(),
                             phys_to_virt(new_frame).as_mut_ptr(),
-                            page_size.into(),
+                            align.into(),
                         )
                     };
 
-                    dealloc_frame(paddr);
+                    dealloc_frame(paddr, align);
 
                     pt.remap(vaddr, new_frame, flags)
                         .map(|(_, tlb)| {
