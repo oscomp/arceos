@@ -21,68 +21,68 @@ const FRAME_SHIFT: usize = 12;
 
 pub const MAX_FRAME_NUM: usize = axconfig::plat::PHYS_MEMORY_SIZE >> FRAME_SHIFT;
 
-static FRAME_INFO_TABLE: LazyInit<Box<[FrameInfo; MAX_FRAME_NUM]>> = LazyInit::new();
+static FRAME_INFO_TABLE: LazyInit<FrameRefTable> = LazyInit::new();
 
 pub fn init_frames() {
-    let _ = FRAME_INFO_TABLE.init_once(Box::new(array::from_fn(|_| FrameInfo::new_empty())));
+    let _ = FRAME_INFO_TABLE.init_once(FrameRefTable::default());
 }
 
-/// Returns the `FrameInfo` structure associated with a given physical address.
-///
-/// # Parameters
-/// - `paddr`: It must be an aligned physical address; if it's a huge page,
-/// it must be the starting physical address.
-///
-/// # Returns
-/// A reference to the `FrameInfo` associated with the given physical address.
-pub fn get_frame_info(paddr: PhysAddr) -> &'static FrameInfo {
-    &FRAME_INFO_TABLE[phys_to_pfn(paddr)]
+pub(crate) fn frame_table() -> &'static FrameRefTable {
+    &FRAME_INFO_TABLE
 }
 
-/// Increases the reference count of the frame associated with a physical address.
-///
-/// # Parameters
-/// - `paddr`: It must be an aligned physical address; if it's a huge page,
-/// it must be the starting physical address.
-pub fn add_frame_ref(paddr: PhysAddr) {
-    get_frame_info(paddr).inc_ref();
+pub(crate) struct FrameRefTable {
+    data: Box<[FrameInfo; MAX_FRAME_NUM]>,
 }
 
-/// Decreases the reference count of the frame associated with a physical address.
-///
-/// - `paddr`: It must be an aligned physical address; if it's a huge page,
-/// it must be the starting physical address.
-///
-/// # Returns
-/// The updated reference count after decrementing.
-pub fn dec_frame_ref(paddr: PhysAddr) -> usize {
-    get_frame_info(paddr).dec_ref()
-}
-
-pub struct FrameInfo {
-    ref_count: AtomicUsize,
-}
-
-impl FrameInfo {
-    fn new_empty() -> Self {
-        Self {
-            ref_count: AtomicUsize::new(0),
+impl Default for FrameRefTable {
+    fn default() -> Self {
+        FrameRefTable {
+            data: Box::new(array::from_fn(|_| FrameInfo::default())),
         }
     }
+}
 
-    fn inc_ref(&self) -> usize {
-        self.ref_count.fetch_add(1, Ordering::SeqCst)
+impl FrameRefTable {
+    fn info(&self, paddr: PhysAddr) -> &FrameInfo {
+        let index = (paddr.as_usize() - axconfig::plat::PHYS_MEMORY_BASE) >> FRAME_SHIFT;
+        &self.data[index]
     }
 
-    fn dec_ref(&self) -> usize {
-        self.ref_count.fetch_sub(1, Ordering::SeqCst)
+    /// Increases the reference count of the frame associated with a physical address.
+    ///
+    /// # Parameters
+    /// - `paddr`: It must be an aligned physical address; if it's a huge page,
+    /// it must be the starting physical address.
+    pub fn inc_ref(&self, paddr: PhysAddr) {
+        self.info(paddr).ref_count.fetch_add(1, Ordering::SeqCst);
     }
 
-    pub fn ref_count(&self) -> usize {
-        self.ref_count.load(Ordering::SeqCst)
+    /// Decreases the reference count of the frame associated with a physical address.
+    ///
+    /// - `paddr`: It must be an aligned physical address; if it's a huge page,
+    /// it must be the starting physical address.
+    ///
+    /// # Returns
+    /// The updated reference count after decrementing.
+    pub fn dec_ref(&self, paddr: PhysAddr) -> usize {
+        self.info(paddr).ref_count.fetch_sub(1, Ordering::SeqCst)
+    }
+
+    /// Returns the `FrameInfo` structure associated with a given physical address.
+    ///
+    /// # Parameters
+    /// - `paddr`: It must be an aligned physical address; if it's a huge page,
+    /// it must be the starting physical address.
+    ///
+    /// # Returns
+    /// A reference to the `FrameInfo` associated with the given physical address.
+    pub fn ref_count(&self, paddr: PhysAddr) -> usize {
+        self.info(paddr).ref_count.load(Ordering::SeqCst)
     }
 }
 
-fn phys_to_pfn(paddr: PhysAddr) -> usize {
-    (paddr.as_usize() - axconfig::plat::PHYS_MEMORY_BASE) >> FRAME_SHIFT
+#[derive(Default)]
+pub(crate) struct FrameInfo {
+    ref_count: AtomicUsize,
 }

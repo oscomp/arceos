@@ -4,7 +4,7 @@ use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use memory_addr::{PAGE_SIZE_4K, PhysAddr, VirtAddr};
 
-use crate::frameinfo::{add_frame_ref, dec_frame_ref};
+use crate::frameinfo::frame_table;
 
 use super::Backend;
 
@@ -35,7 +35,7 @@ pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
         unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, page_size) };
     }
     let paddr = virt_to_phys(vaddr);
-    add_frame_ref(paddr);
+    frame_table().inc_ref(paddr);
     Some(paddr)
 }
 
@@ -60,7 +60,7 @@ pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
 ///   the failure can be obtained from the global memory allocator’s error messages.
 pub fn dealloc_frame(frame: PhysAddr, align: PageSize) {
     let vaddr = phys_to_virt(frame);
-    match dec_frame_ref(frame) {
+    match frame_table().dec_ref(frame) {
         0 => unreachable!(),
         1 => {
             let page_size: usize = align.into();

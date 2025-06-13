@@ -10,7 +10,7 @@ use memory_set::{MemoryArea, MemorySet};
 use page_table_multiarch::PageSize;
 
 use crate::backend::{Backend, PageIterWrapper, alloc_frame, dealloc_frame};
-use crate::frameinfo::{add_frame_ref, get_frame_info};
+use crate::frameinfo::frame_table;
 use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.
@@ -227,15 +227,14 @@ impl AddrSpace {
     /// This function walks through the given virtual address range and attempts to ensure
     /// that every page is mapped. If a page is not mapped and the corresponding area allows
     /// on-demand population (`populate == false`), it will trigger a page fault to map it.
-    /// If `cow_on_write` is true, it will handle copy-on-write (COW) logic for already
+    /// If `access_flags` contains `WRITE`, it will handle copy-on-write (COW) logic for already
     /// mapped pages that may require COW due to write intentions.
     ///
     /// # Parameters
     ///
     /// - `start`: The starting virtual address of the region to map.
     /// - `size`: The size (in bytes) of the region.
-    /// - `align`: Alignment requirement for the allocated memory, must be a multiple of 4KiB.
-    /// - `cow_on_write`: Whether to trigger copy-on-write handling for write-intended mappings.
+    /// - `access_flags` indicates the access type
     ///
     /// # Returns
     ///
@@ -246,14 +245,13 @@ impl AddrSpace {
     ///
     /// - `AxError::NoMemory`: Failed to allocate.
     /// - `AxError::BadAddress`: An invalid mapping state was detected.
-    pub fn ensure_region_mapped(
+    pub fn populate_area(
         &mut self,
         mut start: VirtAddr,
         size: usize,
-        align: PageSize,
-        cow_on_write: bool,
+        access_flags: MappingFlags,
     ) -> AxResult {
-        self.validate_region(start, size, align)?;
+        self.validate_region(start, size, PageSize::Size4K)?;
         let end = start + size;
 
         while let Some(area) = self.areas.find(start) {
@@ -263,11 +261,9 @@ impl AddrSpace {
                     match self.pt.query(addr) {
                         // if the page is already mapped and write intentions, try cow.
                         Ok((paddr, flags, page_size)) => {
-                            if cow_on_write {
-                                if !area.flags().contains(MappingFlags::WRITE) {
-                                    return Err(AxError::BadAddress);
-                                }
-
+                            if flags.contains(MappingFlags::WRITE) {
+                                continue;
+                            } else if access_flags.contains(MappingFlags::WRITE) {
                                 if !Self::handle_cow_fault(
                                     addr,
                                     paddr,
@@ -285,6 +281,8 @@ impl AddrSpace {
                                 if !backend.handle_page_fault(addr, area.flags(), &mut self.pt) {
                                     return Err(AxError::NoMemory);
                                 }
+                            } else {
+                                return Err(AxError::BadAddress);
                             }
                         }
                         Err(_) => return Err(AxError::BadAddress),
@@ -292,7 +290,7 @@ impl AddrSpace {
                 }
             }
             start = area.end();
-            assert!(start.is_aligned(align));
+            assert!(start.is_aligned(PageSize::Size4K));
             if start >= end {
                 break;
             }
@@ -433,15 +431,9 @@ impl AddrSpace {
     ///
     /// Returns an error if the address range is out of the address space or not
     /// aligned.
-    pub fn protect(
-        &mut self,
-        start: VirtAddr,
-        size: usize,
-        flags: MappingFlags,
-        align: PageSize,
-    ) -> AxResult {
+    pub fn protect(&mut self, start: VirtAddr, size: usize, flags: MappingFlags) -> AxResult {
         // Populate the area first, which also checks the address range for us.
-        self.ensure_region_mapped(start, size, align, false)?;
+        self.populate_area(start, size, flags)?;
 
         self.areas
             .protect(start, size, |_| Some(flags), &mut self.pt)
@@ -506,13 +498,12 @@ impl AddrSpace {
                     if !access_flags.contains(MappingFlags::WRITE) {
                         return false;
                     }
-                    let off = page_size.align_offset(vaddr.into());
                     // 1. page fault caused by write
                     // 2. pte exists
                     // 3. Not shared memory
                     return Self::handle_cow_fault(
                         vaddr,
-                        paddr.sub(off),
+                        paddr,
                         orig_flags,
                         page_size,
                         &mut self.pt,
@@ -626,7 +617,7 @@ impl AddrSpace {
                 .expect("Failed to create page iterator")
             {
                 if let Ok((paddr, _, page_size)) = old_pt.query(vaddr) {
-                    add_frame_ref(paddr);
+                    frame_table().inc_ref(paddr);
 
                     old_pt
                         .protect(vaddr, flags)
@@ -647,8 +638,7 @@ impl AddrSpace {
     ///
     /// # Arguments
     /// - `vaddr`: The virtual address that triggered the fault.
-    /// - `paddr`: It must be an aligned physical address; if it's a huge page,
-    /// it must be the starting physical address.
+    /// - `paddr`: The physical address that triggered the fault.
     /// - `flags`: vma flags.
     /// - `align`: Alignment requirement for the allocated memory, must be a multiple of 4KiB.
     /// - `pt`: A mutable reference to the page table that should be updated.
@@ -663,8 +653,9 @@ impl AddrSpace {
         align: PageSize,
         pt: &mut PageTable,
     ) -> bool {
-        let frame_info = get_frame_info(paddr);
-        match frame_info.ref_count() {
+        let paddr = paddr.align_down(align);
+
+        match frame_table().ref_count(paddr) {
             0 => unreachable!(),
             // There is only one AddrSpace reference to the page,
             // so there is no need to copy it.
