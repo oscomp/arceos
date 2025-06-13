@@ -194,8 +194,8 @@ impl AddrSpace {
 
     /// Populates the area with physical frames, returning false if the area
     /// contains unmapped area.
-    pub fn populate_area(&mut self, mut start: VirtAddr, size: usize, align: PageSize) -> AxResult {
-        self.validate_region(start, size, align)?;
+    pub fn populate_area(&mut self, mut start: VirtAddr, size: usize) -> AxResult {
+        self.validate_region(start, size, PageSize::Size4K)?;
         let end = start + size;
 
         while let Some(area) = self.areas.find(start) {
@@ -217,7 +217,7 @@ impl AddrSpace {
                 }
             }
             start = area.end();
-            assert!(start.is_aligned(align));
+            assert!(start.is_aligned_4k());
             if start >= end {
                 break;
             }
@@ -358,15 +358,9 @@ impl AddrSpace {
     ///
     /// Returns an error if the address range is out of the address space or not
     /// aligned.
-    pub fn protect(
-        &mut self,
-        start: VirtAddr,
-        size: usize,
-        flags: MappingFlags,
-        align: PageSize,
-    ) -> AxResult {
+    pub fn protect(&mut self, start: VirtAddr, size: usize, flags: MappingFlags) -> AxResult {
         // Populate the area first, which also checks the address range for us.
-        self.populate_area(start, size, align)?;
+        self.populate_area(start, size)?;
 
         self.areas
             .protect(start, size, |_| Some(flags), &mut self.pt)

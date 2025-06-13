@@ -97,7 +97,7 @@ impl DmaAllocator {
         let expand_size = num_pages * PAGE_SIZE_4K;
         axmm::kernel_aspace()
             .lock()
-            .protect(vaddr, expand_size, flags, PageSize::Size4K)
+            .protect(vaddr, expand_size, flags)
             .map_err(|e| {
                 error!("change table flag fail: {e:?}");
                 AllocError::NoMemory
