@@ -254,7 +254,16 @@ impl AddrSpace {
         self.validate_region(start, size, PageSize::Size4K)?;
         let end = start + size;
 
-        while let Some(area) = self.areas.find(start) {
+        for area in self.areas.iter() {
+            if start >= area.end()  {
+                continue;
+            }
+
+            if start < area.start() {
+                // If the area is not fully mapped, we return ENOMEM.
+                return ax_err!(NoMemory);
+            }
+
             let backend = area.backend();
             if let Backend::Alloc { populate, align } = *backend {
                 for addr in PageIterWrapper::new(start, area.end().min(end), align).unwrap() {
@@ -292,16 +301,13 @@ impl AddrSpace {
             start = area.end();
             assert!(start.is_aligned(PageSize::Size4K));
             if start >= end {
-                break;
+                return Ok(());
             }
         }
 
-        if start < end {
-            // If the area is not fully mapped, we return ENOMEM.
-            return ax_err!(NoMemory);
-        }
-
-        Ok(())
+        // start < end
+        // If the area is not fully mapped, we return ENOMEM.
+        ax_err!(NoMemory)
     }
 
     /// Removes mappings within the specified virtual address range.
