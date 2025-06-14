@@ -8,6 +8,7 @@ extern crate alloc;
 
 mod aspace;
 mod backend;
+#[cfg(feature = "cow")]
 mod frameinfo;
 
 pub use self::aspace::AddrSpace;
@@ -72,6 +73,7 @@ pub fn init_memory_management() {
     KERNEL_ASPACE.init_once(SpinNoIrq::new(kernel_aspace));
     axhal::paging::set_kernel_page_table_root(kernel_page_table_root());
 
+    #[cfg(feature = "cow")]
     frameinfo::init_frames();
 }
 

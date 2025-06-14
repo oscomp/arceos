@@ -4,6 +4,7 @@ use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
 use memory_addr::{PAGE_SIZE_4K, PhysAddr, VirtAddr};
 
+#[cfg(feature = "cow")]
 use crate::frameinfo::frame_table;
 
 use super::Backend;
@@ -35,7 +36,10 @@ pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
         unsafe { core::ptr::write_bytes(vaddr.as_mut_ptr(), 0, page_size) };
     }
     let paddr = virt_to_phys(vaddr);
+
+    #[cfg(feature = "cow")]
     frame_table().inc_ref(paddr);
+
     Some(paddr)
 }
 
@@ -46,7 +50,7 @@ pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
 /// The size of the memory to be freed is determined by the `align` parameter,
 /// which must be a multiple of 4KiB.
 ///
-/// This function decreases the reference count associated with the frame.
+/// If `cow` feature is enabled, this function decreases the reference count associated with the frame.
 /// When the reference count reaches 1, it actually frees the frame memory.
 ///
 /// # Parameters
@@ -59,16 +63,15 @@ pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
 /// - If the deallocation fails, the function will call `panic!`. Details about
 ///   the failure can be obtained from the global memory allocator’s error messages.
 pub fn dealloc_frame(frame: PhysAddr, align: PageSize) {
-    let vaddr = phys_to_virt(frame);
-    match frame_table().dec_ref(frame) {
-        0 => unreachable!(),
-        1 => {
-            let page_size: usize = align.into();
-            let num_pages = page_size / PAGE_SIZE_4K;
-            global_allocator().dealloc_pages(vaddr.as_usize(), num_pages);
-        }
-        _ => (),
+    #[cfg(feature = "cow")]
+    if frame_table().dec_ref(frame) > 1 {
+        return;
     }
+
+    let vaddr = phys_to_virt(frame);
+    let page_size: usize = align.into();
+    let num_pages = page_size / PAGE_SIZE_4K;
+    global_allocator().dealloc_pages(vaddr.as_usize(), num_pages);
 }
 
 impl Backend {
