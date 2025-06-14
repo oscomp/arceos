@@ -78,6 +78,7 @@ fn vec_to_str(vec: u64) -> &'static str {
 fn err_code_to_flags(err_code: u64) -> Result<MappingFlags, u64> {
     let code = PageFaultErrorCode::from_bits_truncate(err_code);
     let reserved_bits = (PageFaultErrorCode::CAUSED_BY_WRITE
+        | PageFaultErrorCode::PROTECTION_VIOLATION
         | PageFaultErrorCode::USER_MODE
         | PageFaultErrorCode::INSTRUCTION_FETCH)
         .complement();

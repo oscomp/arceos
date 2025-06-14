@@ -10,6 +10,8 @@ mod alloc;
 mod linear;
 mod page_iter_wrapper;
 
+pub use alloc::{alloc_frame, dealloc_frame};
+
 /// A unified enum type for different memory mapping backends.
 ///
 /// Currently, two backends are implemented:
