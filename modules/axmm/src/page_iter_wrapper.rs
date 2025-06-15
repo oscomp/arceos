@@ -56,7 +56,6 @@ impl PageIterWrapper {
             PageSize::Size4K => PageIter4K::<VirtAddr>::new(start, end).map(Self::Size4K),
             PageSize::Size2M => PageIter2M::<VirtAddr>::new(start, end).map(Self::Size2M),
             PageSize::Size1G => PageIter1G::<VirtAddr>::new(start, end).map(Self::Size1G),
-            _ => None,
         }
     }
 }
