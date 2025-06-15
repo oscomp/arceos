@@ -7,8 +7,9 @@ use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PhysAddr, VirtAddr, VirtAddrRange, i
 use memory_set::{MemoryArea, MemorySet};
 use page_table_multiarch::PageSize;
 
-use crate::backend::{Backend, PageIterWrapper};
+use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
+use crate::page_iter_wrapper::PageIterWrapper;
 
 #[cfg(feature = "cow")]
 use crate::backend::{alloc_frame, dealloc_frame};
@@ -270,21 +271,22 @@ impl AddrSpace {
             if let Backend::Alloc { populate, align } = *backend {
                 for addr in PageIterWrapper::new(start, area.end().min(end), align).unwrap() {
                     match self.pt.query(addr) {
-                        #[cfg(not(feature = "cow"))]
-                        Ok(_) => (),
-                        #[cfg(feature = "cow")]
+                        #[allow(unused_variables)]
                         Ok((paddr, flags, page_size)) => {
-                            // if the page is already mapped and write intentions, try cow.
-                            if flags.contains(MappingFlags::WRITE) {
-                                continue;
-                            } else if _access_flags.contains(MappingFlags::WRITE) {
-                                if !Self::handle_cow_fault(
-                                    addr,
-                                    paddr,
-                                    flags,
-                                    page_size,
-                                    &mut self.pt,
-                                ) {
+                            #[cfg(feature = "cow")]
+                            {
+                                // if the page is already mapped and write intentions, try cow.
+                                if flags.contains(MappingFlags::WRITE) {
+                                    continue;
+                                } else if _access_flags.contains(MappingFlags::WRITE)
+                                    && !Self::handle_cow_fault(
+                                        addr,
+                                        paddr,
+                                        flags,
+                                        page_size,
+                                        &mut self.pt,
+                                    )
+                                {
                                     return Err(AxError::NoMemory);
                                 }
                             }
@@ -506,19 +508,19 @@ impl AddrSpace {
                 // - shared pages (If there is a shared page in the vma)
                 // - cow
                 #[cfg(feature = "cow")]
-                if access_flags.contains(MappingFlags::WRITE) {
-                    if let Ok((paddr, _, page_size)) = self.pt.query(vaddr) {
-                        // 1. page fault caused by write
-                        // 2. pte exists
-                        // 3. Not shared memory
-                        return Self::handle_cow_fault(
-                            vaddr,
-                            paddr,
-                            orig_flags,
-                            page_size,
-                            &mut self.pt,
-                        );
-                    }
+                if access_flags.contains(MappingFlags::WRITE)
+                    && let Ok((paddr, _, page_size)) = self.pt.query(vaddr)
+                {
+                    // 1. page fault caused by write
+                    // 2. pte exists
+                    // 3. Not shared memory
+                    return Self::handle_cow_fault(
+                        vaddr,
+                        paddr,
+                        orig_flags,
+                        page_size,
+                        &mut self.pt,
+                    );
                 }
 
                 return area
@@ -580,7 +582,7 @@ impl AddrSpace {
             };
 
             #[cfg(feature = "cow")]
-            let cow_flags = area.flags().clone() - MappingFlags::WRITE;
+            let cow_flags = area.flags() - MappingFlags::WRITE;
 
             for vaddr in PageIterWrapper::new(area.start(), area.end(), align)
                 .expect("Failed to create page iterator")

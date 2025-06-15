@@ -14,7 +14,6 @@ use core::{
 
 use alloc::boxed::Box;
 use lazy_static::lazy_static;
-use lazyinit::LazyInit;
 use memory_addr::PhysAddr;
 // 4 kb page
 const FRAME_SHIFT: usize = 12;
@@ -51,7 +50,7 @@ impl FrameRefTable {
     ///
     /// # Parameters
     /// - `paddr`: It must be an aligned physical address; if it's a huge page,
-    /// it must be the starting physical address.
+    ///   it must be the starting physical address.
     pub fn inc_ref(&self, paddr: PhysAddr) {
         self.info(paddr).ref_count.fetch_add(1, Ordering::SeqCst);
     }
@@ -59,7 +58,7 @@ impl FrameRefTable {
     /// Decreases the reference count of the frame associated with a physical address.
     ///
     /// - `paddr`: It must be an aligned physical address; if it's a huge page,
-    /// it must be the starting physical address.
+    ///   it must be the starting physical address.
     ///
     /// # Returns
     /// The updated reference count after decrementing.
@@ -71,7 +70,7 @@ impl FrameRefTable {
     ///
     /// # Parameters
     /// - `paddr`: It must be an aligned physical address; if it's a huge page,
-    /// it must be the starting physical address.
+    ///   it must be the starting physical address.
     ///
     /// # Returns
     /// A reference to the `FrameInfo` associated with the given physical address.

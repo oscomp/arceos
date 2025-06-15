@@ -2,10 +2,7 @@ use core::{alloc::Layout, ptr::NonNull};
 
 use allocator::{AllocError, AllocResult, BaseAllocator, ByteAllocator};
 use axalloc::{DefaultByteAllocator, global_allocator};
-use axhal::{
-    mem::virt_to_phys,
-    paging::{MappingFlags, PageSize},
-};
+use axhal::{mem::virt_to_phys, paging::MappingFlags};
 use kspin::SpinNoIrq;
 use log::{debug, error};
 use memory_addr::{PAGE_SIZE_4K, VirtAddr, va};
