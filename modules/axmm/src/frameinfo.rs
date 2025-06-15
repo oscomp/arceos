@@ -13,18 +13,16 @@ use core::{
 };
 
 use alloc::boxed::Box;
+use lazy_static::lazy_static;
 use lazyinit::LazyInit;
 use memory_addr::PhysAddr;
-
 // 4 kb page
 const FRAME_SHIFT: usize = 12;
 
 pub const MAX_FRAME_NUM: usize = axconfig::plat::PHYS_MEMORY_SIZE >> FRAME_SHIFT;
 
-static FRAME_INFO_TABLE: LazyInit<FrameRefTable> = LazyInit::new();
-
-pub fn init_frames() {
-    let _ = FRAME_INFO_TABLE.init_once(FrameRefTable::default());
+lazy_static! {
+    static ref FRAME_INFO_TABLE: FrameRefTable = FrameRefTable::default();
 }
 
 pub(crate) fn frame_table() -> &'static FrameRefTable {

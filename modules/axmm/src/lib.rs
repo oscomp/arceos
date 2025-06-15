@@ -72,9 +72,6 @@ pub fn init_memory_management() {
     debug!("kernel address space init OK: {:#x?}", kernel_aspace);
     KERNEL_ASPACE.init_once(SpinNoIrq::new(kernel_aspace));
     axhal::paging::set_kernel_page_table_root(kernel_page_table_root());
-
-    #[cfg(feature = "cow")]
-    frameinfo::init_frames();
 }
 
 /// Initializes kernel paging for secondary CPUs.

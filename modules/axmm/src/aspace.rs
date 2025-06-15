@@ -506,20 +506,19 @@ impl AddrSpace {
                 // - shared pages (If there is a shared page in the vma)
                 // - cow
                 #[cfg(feature = "cow")]
-                if let Ok((paddr, _, page_size)) = self.pt.query(vaddr) {
-                    if !access_flags.contains(MappingFlags::WRITE) {
-                        return false;
+                if access_flags.contains(MappingFlags::WRITE) {
+                    if let Ok((paddr, _, page_size)) = self.pt.query(vaddr) {
+                        // 1. page fault caused by write
+                        // 2. pte exists
+                        // 3. Not shared memory
+                        return Self::handle_cow_fault(
+                            vaddr,
+                            paddr,
+                            orig_flags,
+                            page_size,
+                            &mut self.pt,
+                        );
                     }
-                    // 1. page fault caused by write
-                    // 2. pte exists
-                    // 3. Not shared memory
-                    return Self::handle_cow_fault(
-                        vaddr,
-                        paddr,
-                        orig_flags,
-                        page_size,
-                        &mut self.pt,
-                    );
                 }
 
                 return area
@@ -562,92 +561,87 @@ impl AddrSpace {
                 Backend::Alloc { populate: _, align } => {
                     // Forcing `populate = false` is to prevent the subsequent `new_aspace.areas.map`
                     // from mapping page table entries for the virtual addresses.
-                    &Backend::new_alloc(false, *align)
+                    Backend::new_alloc(false, *align)
                 }
-                other => other,
+                other => other.clone(),
             };
 
             // Remap the memory area in the new address space.
-            let new_area =
-                MemoryArea::new(area.start(), area.size(), area.flags(), backend.clone());
+            let new_area = MemoryArea::new(area.start(), area.size(), area.flags(), backend);
             new_aspace
                 .areas
                 .map(new_area, &mut new_aspace.pt, false)
                 .map_err(mapping_err_to_ax_err)?;
 
-            let align = match *backend {
-                Backend::Alloc { align, .. } => align,
+            let align = match area.backend() {
+                Backend::Alloc { align, .. } => *align,
                 // Linear-backed regions are usually allocated by the kernel and are shared
                 Backend::Linear { .. } => continue,
             };
 
             #[cfg(feature = "cow")]
-            let flags = {
-                let mut f = area.flags();
-                f.remove(MappingFlags::WRITE);
-                f
-            };
+            let cow_flags = area.flags().clone() - MappingFlags::WRITE;
 
             for vaddr in PageIterWrapper::new(area.start(), area.end(), align)
                 .expect("Failed to create page iterator")
             {
-                //If the page is mapped in the old page table:
-                // - Update its permissions in the old page table using `flags`.
-                // - Map the same physical page into the new page table at the same
-                // virtual address, with the same page size and `flags`.
-                #[cfg(feature = "cow")]
-                {
-                    match self.pt.query(vaddr) {
-                        Ok((paddr, _, page_size)) => {
+                // Copy data from old memory area to new memory area.
+                match self.pt.query(vaddr) {
+                    Ok((paddr, _, page_size)) => {
+                        #[cfg(not(feature = "cow"))]
+                        {
+                            let new_addr = match new_aspace.pt.query(vaddr) {
+                                Ok((paddr, _, _)) => paddr,
+                                // If the page is not mapped, try map it.
+                                Err(PagingError::NotMapped) => {
+                                    if !area.backend().handle_page_fault(
+                                        vaddr,
+                                        area.flags(),
+                                        &mut new_aspace.pt,
+                                    ) {
+                                        return Err(AxError::NoMemory);
+                                    }
+                                    match new_aspace.pt.query(vaddr) {
+                                        Ok((paddr, _, _)) => paddr,
+                                        Err(_) => return Err(AxError::BadAddress),
+                                    }
+                                }
+                                Err(_) => return Err(AxError::BadAddress),
+                            };
+                            unsafe {
+                                core::ptr::copy_nonoverlapping(
+                                    phys_to_virt(paddr).as_ptr(),
+                                    phys_to_virt(new_addr).as_mut_ptr(),
+                                    page_size.into(),
+                                )
+                            };
+                        }
+
+                        //If the page is mapped in the old page table:
+                        // - Update its permissions in the old page table using `flags`.
+                        // - Map the same physical page into the new page table at the same
+                        // virtual address, with the same page size and `flags`.
+                        #[cfg(feature = "cow")]
+                        {
                             frame_table().inc_ref(paddr);
 
                             self.pt
-                                .protect(vaddr, flags)
+                                .protect(vaddr, cow_flags)
                                 .map(|(_, tlb)| tlb.flush())
                                 .expect("protect failed");
                             new_aspace
                                 .pt
-                                .map(vaddr, paddr, page_size, flags)
+                                .map(vaddr, paddr, page_size, cow_flags)
                                 .map(|tlb| tlb.flush())
                                 .expect("map failed");
-                        }
-                        // If the page is not mapped, skip it.
-                        Err(PagingError::NotMapped) => continue,
-                        Err(_) => return Err(AxError::BadAddress),
-                    }
-                }
 
-                // Copy data from old memory area to new memory area.
-                #[cfg(not(feature = "cow"))]
-                {
-                    let addr = match self.pt.query(vaddr) {
-                        Ok((paddr, _, _)) => paddr,
-                        // If the page is not mapped, skip it.
-                        Err(PagingError::NotMapped) => continue,
-                        Err(_) => return Err(AxError::BadAddress),
-                    };
-                    let new_addr = match new_aspace.pt.query(vaddr) {
-                        Ok((paddr, _, _)) => paddr,
-                        // If the page is not mapped, try map it.
-                        Err(PagingError::NotMapped) => {
-                            if !backend.handle_page_fault(vaddr, area.flags(), &mut new_aspace.pt) {
-                                return Err(AxError::NoMemory);
-                            }
-                            match new_aspace.pt.query(vaddr) {
-                                Ok((paddr, _, _)) => paddr,
-                                Err(_) => return Err(AxError::BadAddress),
-                            }
+                            continue;
                         }
-                        Err(_) => return Err(AxError::BadAddress),
-                    };
-                    unsafe {
-                        core::ptr::copy_nonoverlapping(
-                            phys_to_virt(addr).as_ptr(),
-                            phys_to_virt(new_addr).as_mut_ptr(),
-                            PAGE_SIZE_4K,
-                        )
-                    };
-                }
+                    }
+                    // If the page is not mapped, skip it.
+                    Err(PagingError::NotMapped) => continue,
+                    Err(_) => return Err(AxError::BadAddress),
+                };
             }
         }
         Ok(new_aspace)
