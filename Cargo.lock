@@ -554,6 +554,7 @@ dependencies = [
  "axerrno",
  "axhal",
  "kspin",
+ "lazy_static",
  "lazyinit",
  "log",
  "memory_addr",
