@@ -3,7 +3,7 @@
 //! A simple physical FrameInfo manager is provided to track and manage
 //! the reference count for every 4KB memory page frame in the system.
 //!
-//! There is a [' FrameInfo '] struct for each physical page frame
+//! There is a [`FrameInfo`] struct for each physical page frame
 //! that keeps track of its reference count.
 //! NOTE: If the page is huge page, its [`FrameInfo`] is placed at the
 //! starting physical address.

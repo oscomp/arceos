@@ -538,7 +538,7 @@ impl AddrSpace {
     /// share their mappings into the new one.
     ///
     /// ### Behavior with `cow` Feature Enabled
-    /// - For memory areas backed by `Backend::Alloc`, the `populate` flag is forced
+    /// - For memory areas backed by [`Backend::Alloc`], the `populate` flag is forced
     ///   to `false` to avoid preemptive physical allocation in the new space.
     /// - All writable mappings have their `WRITE` flag removed, enforcing
     ///   Copy-On-Write (COW) semantics.
@@ -551,8 +551,8 @@ impl AddrSpace {
     /// - Each mapped page in the original address space is copied into the
     ///   corresponding address in the new address space.
     /// - If the target address in the new space is not mapped, a page fault is
-    ///   handled via `backend.handle_page_fault`, and memory is allocated before copying.
-    /// - The actual copying is done using `core::ptr::copy_nonoverlapping` at the
+    ///   handled via [`Backend::handle_page_fault`], and memory is allocated before copying.
+    /// - The actual copying is done using [`core::ptr::copy_nonoverlapping`] at the
     ///   physical address level.
     pub fn try_clone(&mut self) -> AxResult<Self> {
         let mut new_aspace = Self::new_empty(self.base(), self.size())?;
