@@ -287,7 +287,8 @@ impl AddrSpace {
                                     && !Self::handle_cow_fault(
                                         addr,
                                         paddr,
-                                        flags,
+                                        // Add write to flags (area.flags contains write)
+                                        area.flags(),
                                         page_size,
                                         &mut self.pt,
                                     )
@@ -674,6 +675,8 @@ impl AddrSpace {
         align: PageSize,
         pt: &mut PageTable,
     ) -> bool {
+        assert!(flags.contains(MappingFlags::WRITE));
+
         let paddr = paddr.align_down(align);
 
         match frame_table().ref_count(paddr) {
