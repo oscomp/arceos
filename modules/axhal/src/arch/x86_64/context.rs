@@ -429,7 +429,7 @@ impl TaskContext {
             self.ext_state.save();
             next_ctx.ext_state.restore();
         }
-        #[cfg(any(feature = "tls"))]
+        #[cfg(feature = "tls")]
         unsafe {
             self.fs_base = super::read_thread_pointer();
             super::write_thread_pointer(next_ctx.fs_base);

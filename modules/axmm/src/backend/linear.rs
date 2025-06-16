@@ -1,6 +1,5 @@
-use axhal::paging::{MappingFlags, PageTable};
+use axhal::paging::{MappingFlags, PageSize, PageTable};
 use memory_addr::{PhysAddr, VirtAddr};
-use page_table_multiarch::PageSize;
 
 use super::Backend;
 

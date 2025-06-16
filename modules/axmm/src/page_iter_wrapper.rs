@@ -5,8 +5,12 @@
 //! The design is inspired by the Iterator Wrapper pattern,
 //! using an enum to unify the behavior of iterators for different page sizes.
 
-use memory_addr::{PageIter, PageIter4K, VirtAddr};
-use page_table_multiarch::PageSize;
+use axhal::mem::VirtAddr;
+use axhal::paging::PageSize;
+use memory_addr::PageIter;
+
+/// 4K page size constant (4,096 bytes) and iterator type alias
+pub use memory_addr::{PAGE_SIZE_4K, PageIter4K};
 
 /// 2MB page size constant (2,097,152 bytes)
 pub const PAGE_SIZE_2M: usize = 0x20_0000;
@@ -31,8 +35,11 @@ pub type PageIter1G<A> = PageIter<PAGE_SIZE_1G, A>;
 /// The design follows the Iterator Wrapper pattern, eliminating type differences
 /// between iterators of varying page sizes.
 pub enum PageIterWrapper {
+    /// 4K page iterator variant
     Size4K(PageIter4K<VirtAddr>),
+    /// 2M page iterator variant
     Size2M(PageIter2M<VirtAddr>),
+    /// 1G page iterator variant
     Size1G(PageIter1G<VirtAddr>),
 }
 
@@ -40,16 +47,21 @@ impl PageIterWrapper {
     /// Creates an iterator wrapper instance for the specified page size
     ///
     /// # Parameters
-    /// - `start`: Starting virtual address (inclusive)
-    /// - `end`: Ending virtual address (exclusive)
+    /// - `start`: Starting virtual address (inclusive), which must be aligned to the `page_size`
+    /// - `end`: Ending virtual address (exclusive), which must also be aligned to the `page_size`
     /// - `page_size`: Enum type specifying the page size
     ///
     /// # Returns
     /// Returns an `Option` wrapping the iterator instance. Returns `None` if the page size is unsupported.
     ///
     /// # Example
-    /// ```
-    // let iter = PageIterWrapper::new(start_addr, end_addr, PageSize::Size2M);
+    /// ```rust
+    /// use axmm::page_iter_wrapper::PageIterWrapper;
+    /// use axhal::paging::PageSize;
+    /// use axhal::mem::VirtAddr;
+    /// let start_addr = VirtAddr::from(0x1000);
+    /// let end_addr = VirtAddr::from(0x3000);
+    /// let iter = PageIterWrapper::new(start_addr, end_addr, PageSize::Size4K);
     /// ```    
     pub fn new(start: VirtAddr, end: VirtAddr, page_size: PageSize) -> Option<Self> {
         match page_size {

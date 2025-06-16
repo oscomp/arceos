@@ -1,5 +1,3 @@
-//! FrameInfo
-//!
 //! A simple physical FrameInfo manager is provided to track and manage
 //! the reference count for every 4KB memory page frame in the system.
 //!
