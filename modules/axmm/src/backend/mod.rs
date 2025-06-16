@@ -1,14 +1,13 @@
 //! Memory mapping backends.
 
-use axhal::paging::{MappingFlags, PageTable};
+use axhal::paging::{MappingFlags, PageSize, PageTable};
 use memory_addr::VirtAddr;
 use memory_set::MappingBackend;
-use page_table_multiarch::PageSize;
-
 mod alloc;
 mod linear;
 
-pub use alloc::{alloc_frame, dealloc_frame};
+#[allow(unused_imports)]
+pub(crate) use alloc::{alloc_frame, dealloc_frame};
 
 /// A unified enum type for different memory mapping backends.
 ///

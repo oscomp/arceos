@@ -10,19 +10,18 @@ mod aspace;
 mod backend;
 #[cfg(feature = "cow")]
 mod frameinfo;
-mod page_iter_wrapper;
 
+pub mod page_iter_wrapper;
 pub use self::aspace::AddrSpace;
 pub use self::backend::Backend;
 
 use axerrno::{AxError, AxResult};
 use axhal::mem::{MemRegionFlags, phys_to_virt};
-use axhal::paging::MappingFlags;
+use axhal::paging::{MappingFlags, PageSize};
 use kspin::SpinNoIrq;
 use lazyinit::LazyInit;
 use memory_addr::{MemoryAddr, PhysAddr, va};
 use memory_set::MappingError;
-use page_table_multiarch::PageSize;
 
 static KERNEL_ASPACE: LazyInit<SpinNoIrq<AddrSpace>> = LazyInit::new();
 

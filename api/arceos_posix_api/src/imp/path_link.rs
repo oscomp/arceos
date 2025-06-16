@@ -364,7 +364,7 @@ fn handle_relative_path(dir_fd: isize, path: &str) -> AxResult<String> {
 fn prepend_cwd(path: &str) -> AxResult<String> {
     let cwd = current_dir().map_err(|_| AxError::NotFound)?;
     debug_assert!(cwd.ends_with('/'), "当前工作目录路径应以 '/' 结尾");
-    Ok(format!("{}{}", cwd, path))
+    Ok(format!("{cwd}{path}"))
 }
 
 /// 根据 `force_dir` 和路径结尾调整路径

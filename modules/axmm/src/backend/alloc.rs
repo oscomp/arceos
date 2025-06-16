@@ -1,8 +1,8 @@
-use crate::page_iter_wrapper::PageIterWrapper;
+use crate::page_iter_wrapper::{PAGE_SIZE_4K, PageIterWrapper};
 use axalloc::global_allocator;
 use axhal::mem::{phys_to_virt, virt_to_phys};
 use axhal::paging::{MappingFlags, PageSize, PageTable};
-use memory_addr::{PAGE_SIZE_4K, PhysAddr, VirtAddr};
+use memory_addr::{PhysAddr, VirtAddr};
 
 #[cfg(feature = "cow")]
 use crate::frameinfo::frame_table;
@@ -28,7 +28,7 @@ use super::Backend;
 /// - If `zeroed` is `true`, the function uses `unsafe` operations to zero out the memory.
 /// - The allocated memory must be accessed via its physical address, which requires
 ///   conversion using `virt_to_phys`.
-pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
+pub(crate) fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
     let page_size: usize = align.into();
     let num_pages = page_size / PAGE_SIZE_4K;
     let vaddr = VirtAddr::from(global_allocator().alloc_pages(num_pages, page_size).ok()?);
@@ -62,7 +62,7 @@ pub fn alloc_frame(zeroed: bool, align: PageSize) -> Option<PhysAddr> {
 ///   otherwise undefined behavior may occur.
 /// - If the deallocation fails, the function will call `panic!`. Details about
 ///   the failure can be obtained from the global memory allocator’s error messages.
-pub fn dealloc_frame(frame: PhysAddr, align: PageSize) {
+pub(crate) fn dealloc_frame(frame: PhysAddr, align: PageSize) {
     #[cfg(feature = "cow")]
     if frame_table().dec_ref(frame) > 1 {
         return;

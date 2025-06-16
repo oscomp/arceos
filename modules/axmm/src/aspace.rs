@@ -2,15 +2,14 @@ use core::fmt;
 
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::mem::phys_to_virt;
-use axhal::paging::{MappingFlags, PageTable, PagingError};
+use axhal::paging::{MappingFlags, PageSize, PageTable, PagingError};
 use axhal::trap::PageFaultFlags;
-use memory_addr::{MemoryAddr, PAGE_SIZE_4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned};
+use memory_addr::{MemoryAddr, PhysAddr, VirtAddr, VirtAddrRange, is_aligned};
 use memory_set::{MemoryArea, MemorySet};
-use page_table_multiarch::PageSize;
 
 use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
-use crate::page_iter_wrapper::PageIterWrapper;
+use crate::page_iter_wrapper::{PAGE_SIZE_4K, PageIterWrapper};
 
 #[cfg(feature = "cow")]
 use crate::backend::{alloc_frame, dealloc_frame};
@@ -197,8 +196,8 @@ impl AddrSpace {
     ///
     /// # Parameters
     ///
-    /// - `start`: The starting virtual address of the region to map.
-    /// - `size`: The size (in bytes) of the region.
+    /// - `start`: The starting virtual address of the region to map, which must be page-aligned.
+    /// - `size`: The size (in bytes) of the region, which must also be page-aligned.
     /// - `access_flags` indicates the access type
     ///
     /// # Returns
@@ -231,7 +230,13 @@ impl AddrSpace {
 
             let backend = area.backend();
             if let Backend::Alloc { populate, align } = *backend {
-                for addr in PageIterWrapper::new(start, area.end().min(end), align).unwrap() {
+                for addr in PageIterWrapper::new(
+                    start.align_down(align),
+                    end.align_up(align).min(area.end()),
+                    align,
+                )
+                .unwrap()
+                {
                     match self.pt.query(addr) {
                         #[allow(unused_variables)]
                         Ok((paddr, flags, page_size)) => {
@@ -514,8 +519,8 @@ impl AddrSpace {
     /// ### Behavior without `cow` Feature
     /// - Each mapped page in the original address space is copied into the
     ///   corresponding address in the new address space.
-    /// - If the target address in the new space is not mapped, a page fault is
-    ///   handled via [`Backend::handle_page_fault`], and memory is allocated before copying.
+    /// - If the target address in the new space is not mapped, a page fault will be
+    ///   handled, and memory is allocated before copying.
     /// - The actual copying is done using [`core::ptr::copy_nonoverlapping`] at the
     ///   physical address level.
     pub fn try_clone(&mut self) -> AxResult<Self> {
