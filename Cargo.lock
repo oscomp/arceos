@@ -1286,29 +1286,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "945462a4b81e43c4e3ba96bd7b49d834c6f61198356aa858733bc4acf3cbe62e"
 
 [[package]]
-name = "page_table_entry"
-version = "0.5.3"
-source = "git+https://github.com/OrangeQi-CQ/page_table_multiarch?rev=8bbd18a#8bbd18a15770c74734d2b2f69b69243ee53d6739"
-dependencies = [
- "aarch64-cpu 10.0.0",
- "bitflags 2.9.1",
- "memory_addr",
- "x86_64 0.15.2",
-]
-
-[[package]]
-name = "page_table_multiarch"
-version = "0.5.3"
-source = "git+https://github.com/OrangeQi-CQ/page_table_multiarch?rev=8bbd18a#8bbd18a15770c74734d2b2f69b69243ee53d6739"
-dependencies = [
- "log",
- "memory_addr",
- "page_table_entry",
- "riscv 0.12.1",
- "x86",
-]
-
-[[package]]
 name = "paste"
 version = "1.0.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
