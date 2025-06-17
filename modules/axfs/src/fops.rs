@@ -107,7 +107,6 @@ impl OpenOptions {
     pub fn direct(&mut self, direct: bool) {
         self.direct = direct;
     }
-    
     /// check whether contains directory.
     pub fn has_directory(&self) -> bool {
         self.directory

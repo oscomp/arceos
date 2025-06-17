@@ -1,15 +1,15 @@
 use core::fmt;
 
+use crate::backend::Backend;
+use crate::mapping_err_to_ax_err;
 use axerrno::{AxError, AxResult, ax_err};
+use axhal::arch::flush_tlb;
 use axhal::mem::phys_to_virt;
-use axhal::paging::{MappingFlags, PageTable, PagingError, PageSize};
+use axhal::paging::{MappingFlags, PageSize, PageTable, PagingError};
 use memory_addr::{
     MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
 };
 use memory_set::{MemoryArea, MemorySet};
-use axhal::arch::flush_tlb;
-use crate::backend::Backend;
-use crate::mapping_err_to_ax_err;
 
 /// The virtual memory address space.
 pub struct AddrSpace {
@@ -44,11 +44,11 @@ impl AddrSpace {
         flush_tlb(Some(vaddr));
         self.pt.is_dirty(vaddr).unwrap()
     }
-    
+
     pub fn set_page_dirty(&mut self, vaddr: VirtAddr, dirty: bool) {
         self.pt.set_dirty(vaddr, dirty).unwrap();
     }
-    
+
     pub fn check_page_access(&mut self, vaddr: VirtAddr) -> bool {
         // 必须要刷新 tlb，否则会导致标志位不同步！
         flush_tlb(Some(vaddr));
@@ -183,43 +183,50 @@ impl AddrSpace {
 
     /// Forcely set the page table
     pub fn force_map_page(
-        &mut self, 
-        vaddr: VirtAddr, 
-        paddr: PhysAddr, 
-        access_flags: MappingFlags
+        &mut self,
+        vaddr: VirtAddr,
+        paddr: PhysAddr,
+        access_flags: MappingFlags,
     ) -> bool {
         match self.areas.find(vaddr) {
             Some(area) => {
                 if !area.flags().contains(access_flags) {
-                    panic!("FORCE MAP PAGE FAILED(ACCESS MOD): {:#x} => {:#x}!", vaddr, paddr);
+                    panic!(
+                        "FORCE MAP PAGE FAILED(ACCESS MOD): {:#x} => {:#x}!",
+                        vaddr, paddr
+                    );
                 }
                 match self.pt.map(vaddr, paddr, PageSize::Size4K, area.flags()) {
                     Ok(_) => {
                         return true;
-                    },
+                    }
                     Err(e) => {
-                        panic!("FORCE MAP PAGE FAILED(PAGE TABLE FAILED {:?}): {:#x} => {:#x}", e, vaddr, paddr);
+                        panic!(
+                            "FORCE MAP PAGE FAILED(PAGE TABLE FAILED {:?}): {:#x} => {:#x}",
+                            e, vaddr, paddr
+                        );
                     }
                 }
-            },
+            }
             _ => {
-                panic!("FORCE MAP PAGE FAILED(NOT FOUND AREA): {:#x} => {:#x}!", vaddr, paddr);
-            },
+                panic!(
+                    "FORCE MAP PAGE FAILED(NOT FOUND AREA): {:#x} => {:#x}!",
+                    vaddr, paddr
+                );
+            }
         };
     }
-
 
     pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
         match self.areas.find(vaddr) {
             Some(_) => {
-                self.pt.unmap(vaddr)
-                    .map(|_| true)
-                    .unwrap_or_else(|_| panic!("FORCE FORCE PAGE FAILED(PAGE TABLE FAILEDA): {:#x}!", vaddr));
-            },
+                self.pt.unmap(vaddr).map(|_| true).unwrap_or_else(|_| {
+                    panic!("FORCE FORCE PAGE FAILED(PAGE TABLE FAILEDA): {:#x}!", vaddr)
+                });
+            }
             _ => panic!("FORCE UNMAP PAGE FAILED(NOT FOUND AREA): {:#x}!", vaddr),
         };
     }
-
 
     /// Populates the area with physical frames, returning false if the area
     /// contains unmapped area.
