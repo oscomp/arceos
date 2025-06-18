@@ -248,7 +248,7 @@ impl AddrSpace {
         Ok(())
     }
 
-    /// Forcely set the page table
+    /// Forcely map a page.
     pub fn force_map_page(
         &mut self,
         vaddr: VirtAddr,
@@ -284,11 +284,12 @@ impl AddrSpace {
         };
     }
 
+    // Forcely unmap a page.
     pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
         match self.areas.find(vaddr) {
             Some(_) => {
-                self.pt.unmap(vaddr).map(|_| true).unwrap_or_else(|_| {
-                    panic!("FORCE UNMAP PAGE FAILED(PAGE TABLE FAILED): {:#x}!", vaddr)
+                self.pt.unmap(vaddr).map(|_| true).unwrap_or_else(|e| {
+                    panic!("FORCE UNMAP PAGE FAILED(PAGE TABLE FAILED) {:?}: {:#x}!", e, vaddr)
                 });
             }
             _ => panic!("FORCE UNMAP PAGE FAILED(NOT FOUND AREA): {:#x}!", vaddr),
