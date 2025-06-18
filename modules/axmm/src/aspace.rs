@@ -43,22 +43,26 @@ impl AddrSpace {
         &self.pt
     }
 
+    /// Check whether a page is dirty.
     pub fn check_page_dirty(&mut self, vaddr: VirtAddr) -> bool {
         // 必须要刷新 tlb，否则会导致标志位不同步！
         flush_tlb(Some(vaddr));
         self.pt.is_dirty(vaddr).unwrap()
     }
 
+    /// Set dirty flags for a page.
     pub fn set_page_dirty(&mut self, vaddr: VirtAddr, dirty: bool) {
         self.pt.set_dirty(vaddr, dirty).unwrap();
     }
 
+    /// Check whether a page is accessed.
     pub fn check_page_access(&mut self, vaddr: VirtAddr) -> bool {
         // 必须要刷新 tlb，否则会导致标志位不同步！
         flush_tlb(Some(vaddr));
         self.pt.is_accessed(vaddr).unwrap()
     }
 
+    /// Set the access flags for a page.
     pub fn set_page_access(&mut self, vaddr: VirtAddr, access: bool) {
         self.pt.set_accessed(vaddr, access).unwrap();
     }
@@ -284,7 +288,7 @@ impl AddrSpace {
         match self.areas.find(vaddr) {
             Some(_) => {
                 self.pt.unmap(vaddr).map(|_| true).unwrap_or_else(|_| {
-                    panic!("FORCE FORCE PAGE FAILED(PAGE TABLE FAILEDA): {:#x}!", vaddr)
+                    panic!("FORCE UNMAP PAGE FAILED(PAGE TABLE FAILED): {:#x}!", vaddr)
                 });
             }
             _ => panic!("FORCE UNMAP PAGE FAILED(NOT FOUND AREA): {:#x}!", vaddr),
