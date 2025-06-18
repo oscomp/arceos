@@ -289,7 +289,10 @@ impl AddrSpace {
         match self.areas.find(vaddr) {
             Some(_) => {
                 self.pt.unmap(vaddr).map(|_| true).unwrap_or_else(|e| {
-                    panic!("FORCE UNMAP PAGE FAILED(PAGE TABLE FAILED) {:?}: {:#x}!", e, vaddr)
+                    panic!(
+                        "FORCE UNMAP PAGE FAILED(PAGE TABLE FAILED) {:?}: {:#x}!",
+                        e, vaddr
+                    )
                 });
             }
             _ => panic!("FORCE UNMAP PAGE FAILED(NOT FOUND AREA): {:#x}!", vaddr),
