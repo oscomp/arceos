@@ -1,14 +1,14 @@
 use core::fmt;
 
+use crate::backend::Backend;
+use crate::mapping_err_to_ax_err;
+use crate::page_iter_wrapper::{PAGE_SIZE_4K, PageIterWrapper};
 use axerrno::{AxError, AxResult, ax_err};
+use axhal::arch::flush_tlb;
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageSize, PageTable, PagingError};
 use memory_addr::{MemoryAddr, PhysAddr, VirtAddr, VirtAddrRange, is_aligned};
 use memory_set::{MemoryArea, MemorySet};
-
-use crate::backend::Backend;
-use crate::mapping_err_to_ax_err;
-use crate::page_iter_wrapper::{PAGE_SIZE_4K, PageIterWrapper};
 
 #[cfg(feature = "cow")]
 use crate::backend::{alloc_frame, dealloc_frame};
@@ -41,6 +41,30 @@ impl AddrSpace {
     /// Returns the reference to the inner page table.
     pub const fn page_table(&self) -> &PageTable {
         &self.pt
+    }
+
+    /// Check whether a page is dirty.
+    pub fn check_page_dirty(&mut self, vaddr: VirtAddr) -> bool {
+        // 必须要刷新 tlb，否则会导致标志位不同步！
+        flush_tlb(Some(vaddr));
+        self.pt.is_dirty(vaddr).unwrap()
+    }
+
+    /// Set dirty flags for a page.
+    pub fn set_page_dirty(&mut self, vaddr: VirtAddr, dirty: bool) {
+        self.pt.set_dirty(vaddr, dirty).unwrap();
+    }
+
+    /// Check whether a page is accessed.
+    pub fn check_page_access(&mut self, vaddr: VirtAddr) -> bool {
+        // 必须要刷新 tlb，否则会导致标志位不同步！
+        flush_tlb(Some(vaddr));
+        self.pt.is_accessed(vaddr).unwrap()
+    }
+
+    /// Set the access flags for a page.
+    pub fn set_page_access(&mut self, vaddr: VirtAddr, access: bool) {
+        self.pt.set_accessed(vaddr, access).unwrap();
     }
 
     /// Returns the root physical address of the inner page table.
@@ -222,6 +246,57 @@ impl AddrSpace {
             .map(area, &mut self.pt, false)
             .map_err(mapping_err_to_ax_err)?;
         Ok(())
+    }
+
+    /// Forcely map a page.
+    pub fn force_map_page(
+        &mut self,
+        vaddr: VirtAddr,
+        paddr: PhysAddr,
+        access_flags: MappingFlags,
+    ) -> bool {
+        match self.areas.find(vaddr) {
+            Some(area) => {
+                if !area.flags().contains(access_flags) {
+                    panic!(
+                        "FORCE MAP PAGE FAILED(ACCESS MOD): {:#x} => {:#x}!",
+                        vaddr, paddr
+                    );
+                }
+                match self.pt.map(vaddr, paddr, PageSize::Size4K, area.flags()) {
+                    Ok(_) => {
+                        return true;
+                    }
+                    Err(e) => {
+                        panic!(
+                            "FORCE MAP PAGE FAILED(PAGE TABLE FAILED {:?}): {:#x} => {:#x}",
+                            e, vaddr, paddr
+                        );
+                    }
+                }
+            }
+            _ => {
+                panic!(
+                    "FORCE MAP PAGE FAILED(NOT FOUND AREA): {:#x} => {:#x}!",
+                    vaddr, paddr
+                );
+            }
+        };
+    }
+
+    /// Forcely unmap a page.
+    pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
+        match self.areas.find(vaddr) {
+            Some(_) => {
+                self.pt.unmap(vaddr).map(|_| true).unwrap_or_else(|e| {
+                    panic!(
+                        "FORCE UNMAP PAGE FAILED(PAGE TABLE FAILED) {:?}: {:#x}!",
+                        e, vaddr
+                    )
+                });
+            }
+            _ => panic!("FORCE UNMAP PAGE FAILED(NOT FOUND AREA): {:#x}!", vaddr),
+        };
     }
 
     /// Ensures that the specified virtual memory region is fully mapped.
