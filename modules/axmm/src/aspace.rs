@@ -284,7 +284,7 @@ impl AddrSpace {
         };
     }
 
-    // Forcely unmap a page.
+    /// Forcely unmap a page.
     pub fn force_unmap_page(&mut self, vaddr: VirtAddr) {
         match self.areas.find(vaddr) {
             Some(_) => {
