@@ -2,21 +2,14 @@ use core::fmt;
 
 use crate::backend::Backend;
 use crate::mapping_err_to_ax_err;
+use crate::page_iter_wrapper::{PAGE_SIZE_4K, PageIterWrapper};
 use axerrno::{AxError, AxResult, ax_err};
 use axhal::arch::flush_tlb;
 use axhal::mem::phys_to_virt;
 use axhal::paging::{MappingFlags, PageSize, PageTable, PagingError};
-use memory_addr::{
-    MemoryAddr, PAGE_SIZE_4K, PageIter4K, PhysAddr, VirtAddr, VirtAddrRange, is_aligned_4k,
-};
 use memory_set::{MemoryArea, MemorySet};
-
 use memory_addr::{MemoryAddr, PhysAddr, VirtAddr, VirtAddrRange, is_aligned};
-use memory_set::{MemoryArea, MemorySet};
 
-use crate::backend::Backend;
-use crate::mapping_err_to_ax_err;
-use crate::page_iter_wrapper::{PAGE_SIZE_4K, PageIterWrapper};
 
 #[cfg(feature = "cow")]
 use crate::backend::{alloc_frame, dealloc_frame};
@@ -51,25 +44,25 @@ impl AddrSpace {
         &self.pt
     }
 
-    pub fn check_page_dirty(&mut self, vaddr: VirtAddr) -> bool {
-        // 必须要刷新 tlb，否则会导致标志位不同步！
-        flush_tlb(Some(vaddr));
-        self.pt.is_dirty(vaddr).unwrap()
-    }
+    // pub fn check_page_dirty(&mut self, vaddr: VirtAddr) -> bool {
+    //     // 必须要刷新 tlb，否则会导致标志位不同步！
+    //     flush_tlb(Some(vaddr));
+    //     self.pt.is_dirty(vaddr).unwrap()
+    // }
 
-    pub fn set_page_dirty(&mut self, vaddr: VirtAddr, dirty: bool) {
-        self.pt.set_dirty(vaddr, dirty).unwrap();
-    }
+    // pub fn set_page_dirty(&mut self, vaddr: VirtAddr, dirty: bool) {
+    //     self.pt.set_dirty(vaddr, dirty).unwrap();
+    // }
 
-    pub fn check_page_access(&mut self, vaddr: VirtAddr) -> bool {
-        // 必须要刷新 tlb，否则会导致标志位不同步！
-        flush_tlb(Some(vaddr));
-        self.pt.is_accessed(vaddr).unwrap()
-    }
+    // pub fn check_page_access(&mut self, vaddr: VirtAddr) -> bool {
+    //     // 必须要刷新 tlb，否则会导致标志位不同步！
+    //     flush_tlb(Some(vaddr));
+    //     self.pt.is_accessed(vaddr).unwrap()
+    // }
 
-    pub fn set_page_access(&mut self, vaddr: VirtAddr, access: bool) {
-        self.pt.set_accessed(vaddr, access).unwrap();
-    }
+    // pub fn set_page_access(&mut self, vaddr: VirtAddr, access: bool) {
+    //     self.pt.set_accessed(vaddr, access).unwrap();
+    // }
 
     /// Returns the root physical address of the inner page table.
     pub const fn page_table_root(&self) -> PhysAddr {
