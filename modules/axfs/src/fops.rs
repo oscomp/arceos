@@ -112,6 +112,7 @@ impl OpenOptions {
         self.directory
     }
 
+    /// check whether unuse page cache.
     pub fn has_direct(&self) -> bool {
         self.direct
     }
@@ -135,6 +136,7 @@ impl OpenOptions {
         self
     }
 
+    /// Sets the direct flag.
     pub fn set_direct(mut self, direct: bool) -> Self {
         self.direct = direct;
         self
