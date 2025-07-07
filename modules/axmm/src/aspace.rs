@@ -52,7 +52,7 @@ impl AddrSpace {
     }
 
     /// Creates a new empty address space.
-    pub(crate) fn new_empty(base: VirtAddr, size: usize) -> AxResult<Self> {
+    pub fn new_empty(base: VirtAddr, size: usize) -> AxResult<Self> {
         Ok(Self {
             va_range: VirtAddrRange::from_start_size(base, size),
             areas: MemorySet::new(),
@@ -67,6 +67,7 @@ impl AddrSpace {
     /// user space.
     ///
     /// Returns an error if the two address spaces overlap.
+    #[cfg(feature = "copy-from")]
     pub fn copy_mappings_from(&mut self, other: &AddrSpace) -> AxResult {
         if self.va_range.overlaps(other.va_range) {
             return ax_err!(InvalidInput, "address space overlap");
@@ -375,7 +376,7 @@ impl AddrSpace {
 
     /// Clone a [`AddrSpace`] by re-mapping all [`MemoryArea`]s in a new page table and copying data in user space.
     pub fn clone_or_err(&mut self) -> AxResult<Self> {
-        let mut new_aspace = crate::new_user_aspace(self.base(), self.size())?;
+        let mut new_aspace = Self::new_empty(self.base(), self.size())?;
 
         for area in self.areas.iter() {
             let backend = area.backend();
