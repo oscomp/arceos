@@ -1439,8 +1439,9 @@ dependencies = [
 [[package]]
 name = "lwext4_rust"
 version = "0.2.0"
-source = "git+https://github.com/Azure-stars/lwext4_rust.git#d1561e971c37555428695b12b869ec938af5a058"
+source = "git+https://github.com/Starry-Mix-THU/lwext4_rust.git?rev=837bd5e#837bd5e248e0105cc0189d237cd252fc83f10d21"
 dependencies = [
+ "bindgen",
  "log",
 ]
 

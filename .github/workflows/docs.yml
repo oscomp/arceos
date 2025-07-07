@@ -11,6 +11,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            arch: x86_64
+          - os: macos-latest
+            arch: aarch64
       fail-fast: false
     permissions:
       contents: write
@@ -27,9 +32,9 @@ jobs:
         cache-targets: false
     - uses: arceos-org/setup-musl@v1
       with:
-        arch: x86_64
+        arch: ${{ matrix.arch }}
     - name: Build docs
-      run: make doc_check_missing ARCH=${{ matrix.os == 'macos-latest' && 'aarch64' || 'x86_64' }}
+      run: make doc_check_missing ARCH=${{ matrix.arch }}
     - name: Deploy to Github Pages
       if: ${{ github.ref == env.default-branch && matrix.os == 'ubuntu-latest' }}
       uses: JamesIves/github-pages-deploy-action@v4
