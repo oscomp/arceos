@@ -3,6 +3,7 @@ mod macros;
 
 mod context;
 mod trap;
+mod unaligned;
 
 use core::arch::asm;
 use loongArch64::register::{crmd, ecfg, eentry, pgdh, pgdl, stlbps, tlbidx, tlbrehi, tlbrentry};

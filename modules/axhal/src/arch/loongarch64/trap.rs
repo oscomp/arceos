@@ -1,4 +1,7 @@
-use super::context::TrapFrame;
+use super::{
+    context::TrapFrame,
+    unaligned::emulate_load_store_insn
+};
 use loongArch64::register::{
     badv,
     estat::{self, Exception, Trap},
@@ -48,6 +51,7 @@ fn loongarch64_trap_handler(tf: &mut TrapFrame, from_user: bool) {
             tf.era += 4;
             tf.regs.a0 = crate::trap::handle_syscall(tf, tf.regs.a7) as usize;
         }
+        Trap::Exception(Exception::AddressNotAligned) => unsafe { emulate_load_store_insn(tf) },
         Trap::Exception(Exception::LoadPageFault)
         | Trap::Exception(Exception::PageNonReadableFault) => {
             handle_page_fault(tf, MappingFlags::READ, from_user)

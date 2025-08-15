@@ -6,6 +6,7 @@ const BUILTIN_PLATFORMS: &[&str] = &[
     "aarch64-qemu-virt",
     "aarch64-raspi4",
     "loongarch64-qemu-virt",
+    "loongarch64-2k1000",
     "riscv64-qemu-virt",
     "x86_64-pc-oslab",
     "x86_64-qemu-q35",
@@ -17,6 +18,7 @@ const BUILTIN_PLATFORM_FAMILIES: &[&str] = &[
     "aarch64-qemu-virt",
     "aarch64-raspi",
     "loongarch64-qemu-virt",
+    "loongarch64-2k1000",
     "riscv64-qemu-virt",
     "x86-pc",
 ];
