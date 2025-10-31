@@ -46,6 +46,7 @@ pub struct OpenOptions {
     create: bool,
     create_new: bool,
     directory: bool,
+    direct: bool,
     // system-specific
     _custom_flags: i32,
     _mode: u32,
@@ -64,6 +65,7 @@ impl OpenOptions {
             create: false,
             create_new: false,
             directory: false,
+            direct: false,
             // system-specific
             _custom_flags: 0,
             _mode: 0o666,
@@ -101,9 +103,18 @@ impl OpenOptions {
     pub fn directory(&mut self, directory: bool) {
         self.directory = directory;
     }
+    /// Sets the option to use page cache
+    pub fn direct(&mut self, direct: bool) {
+        self.direct = direct;
+    }
     /// check whether contains directory.
     pub fn has_directory(&self) -> bool {
         self.directory
+    }
+
+    /// check whether unuse page cache.
+    pub fn has_direct(&self) -> bool {
+        self.direct
     }
 
     /// Sets the create flags.
@@ -122,6 +133,12 @@ impl OpenOptions {
     /// Sets the write flag.
     pub fn set_write(mut self, write: bool) -> Self {
         self.write = write;
+        self
+    }
+
+    /// Sets the direct flag.
+    pub fn set_direct(mut self, direct: bool) -> Self {
+        self.direct = direct;
         self
     }
 
