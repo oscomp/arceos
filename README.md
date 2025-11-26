@@ -1,6 +1,8 @@
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/oscomp/arceos)
 # ArceOS
 
+NO LONGER MAINTAINED. You can check for the latest stable maintenance version in https://github.com/Starry-OS/arceos.
+
 [![CI](https://github.com/arceos-org/arceos/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/arceos-org/arceos/actions/workflows/build.yml)
 [![CI](https://github.com/arceos-org/arceos/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/arceos-org/arceos/actions/workflows/test.yml)
 [![Docs](https://img.shields.io/badge/docs-pages-green)](https://arceos-org.github.io/arceos/)
