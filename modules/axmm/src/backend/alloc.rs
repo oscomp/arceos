@@ -145,6 +145,7 @@ impl Backend {
         align: PageSize,
     ) -> bool {
         if populate {
+            error!("populate!");
             false // Populated mappings should not trigger page faults.
         } else if let Some(frame) = alloc_frame(true, align) {
             // Allocate a physical frame lazily and map it to the fault address.
@@ -154,6 +155,7 @@ impl Backend {
                 .map(|tlb| tlb.flush())
                 .is_ok()
         } else {
+            error!("alloc frame failed");
             false
         }
     }
